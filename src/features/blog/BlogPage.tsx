@@ -1,11 +1,43 @@
-import { RoutePlaceholder } from '../shared/RoutePlaceholder';
+import { useSearchParams } from 'react-router-dom';
 
+import { siteConfig } from '../../app/config/siteConfig';
+import { IconImage } from '../../components/common';
+import { ListingGrid, Pagination, usePagedListings } from '../content';
+
+/** Paginated blog listing from validated catalog listings (no full-body fetches). */
 export default function BlogPage() {
+  const [params] = useSearchParams();
+  const requestedPage = Number(params.get('page') ?? '1');
+  const { page, state } = usePagedListings(
+    { type: 'blog-post' },
+    requestedPage,
+    siteConfig.pageSizes.blog,
+  );
+
   return (
-    <RoutePlaceholder
-      title="Blog"
-      lead="Long-form posts published to Shadow Archives and stored on QDN."
-      note="Post discovery, reading and engagement arrive with the catalog and engagement phases. This route is a real lazy boundary, so shipping it costs the visitor shell nothing."
-    />
+    <div className="sa-route">
+      <header className="sa-route__header">
+        <h1 className="sa-route__title">Blog</h1>
+        <p className="sa-route__lead">
+          Long-form posts published by Shadow Archives. Listings use catalog metadata; a post body
+          is downloaded only on its own page.
+        </p>
+      </header>
+
+      <ListingGrid
+        state={state}
+        emptyTitle="No posts published yet"
+        emptyDescription="No blog posts are available from the verified publisher scope."
+        emptyIcon={<IconImage width={26} height={26} />}
+        loadingCount={siteConfig.pageSizes.blog}
+      />
+
+      <Pagination
+        page={page.page}
+        pageCount={page.pageCount}
+        hrefFor={(target) => (target > 1 ? `/blog?page=${target}` : '/blog')}
+        label="Blog"
+      />
+    </div>
   );
 }

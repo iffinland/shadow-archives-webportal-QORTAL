@@ -28,9 +28,15 @@ export default function AboutPage() {
 
         <h2>Phase status</h2>
         <p>
-          This build is the {siteConfig.phaseLabel.toLowerCase()}: the responsive application shell,
-          routing boundaries and design tokens. Content discovery, publishing, engagement and search
-          are later phases. Nothing on this site is loaded from QDN yet.
+          This build is the {siteConfig.phaseLabel.toLowerCase()}: the responsive application shell
+          plus read-only QDN content discovery, runtime validation and rendering. Every payload is
+          validated before it is trusted, and the archive states distinguish an empty archive from
+          an unavailable, partial or stale index.
+        </p>
+        <p>
+          Publishing, editing, likes, comments, tips, sharing and owner studio functionality are
+          deliberately not implemented in this phase. Browsing the archive never asks for a Qortal
+          account or triggers an authentication prompt.
         </p>
 
         <h2>Privacy and dependencies</h2>

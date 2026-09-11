@@ -1,28 +1,24 @@
+import { useListingState } from '../content/hooks';
 import type { CollectionState, ContentCardModel } from '../../types/content';
 
 /**
- * Latest-content data source for the home route.
+ * Latest-content data sources for the home route.
  *
- * Phase 1B performs NO QDN discovery and ships NO mock network API. The state is
- * honestly `unavailable` until the catalog/discovery phase lands; the sections
- * render empty states with reserved geometry so swapping in real data later
- * causes no layout shift.
+ * Home consumes validated catalog listings from the archive repository. Listing
+ * cards use catalog/thumbnail metadata only: home never fetches a blog body,
+ * video bytes or a gallery original.
  */
-const NOT_IMPLEMENTED_MESSAGE =
-  'Content discovery arrives in a later phase; nothing is loaded from QDN yet.';
-
-function unavailable<T>(): CollectionState<T> {
-  return { status: 'unavailable', items: [], message: NOT_IMPLEMENTED_MESSAGE };
-}
+export const HOME_PREVIEW_COUNT = 4;
+export const GALLERY_STRIP_COUNT = 8;
 
 export function useLatestPosts(): CollectionState<ContentCardModel> {
-  return unavailable<ContentCardModel>();
+  return useListingState({ type: 'blog-post' }, HOME_PREVIEW_COUNT);
 }
 
 export function useLatestVideos(): CollectionState<ContentCardModel> {
-  return unavailable<ContentCardModel>();
+  return useListingState({ type: 'video' }, HOME_PREVIEW_COUNT);
 }
 
 export function useLatestGalleryItems(): CollectionState<ContentCardModel> {
-  return unavailable<ContentCardModel>();
+  return useListingState({ type: 'gallery-item' }, GALLERY_STRIP_COUNT);
 }

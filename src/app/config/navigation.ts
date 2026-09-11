@@ -14,7 +14,10 @@ export const routes = {
   videos: '/videos',
   videoDetail: (id: string) => `/videos/${encodeURIComponent(id)}`,
   gallery: '/gallery',
-  galleryDetail: (id: string) => `/gallery/${encodeURIComponent(id)}`,
+  galleryAlbum: (id: string) => `/gallery/album/${encodeURIComponent(id)}`,
+  galleryItem: (id: string) => `/gallery/item/${encodeURIComponent(id)}`,
+  /** Legacy Phase 1B generic gallery path; resolves to an item. */
+  galleryLegacy: (id: string) => `/gallery/${encodeURIComponent(id)}`,
   about: '/about',
   contact: '/contact',
   category: (slug: string) => `/category/${encodeURIComponent(slug)}`,

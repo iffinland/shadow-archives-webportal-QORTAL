@@ -17,8 +17,9 @@ const LABELS: Record<TopListKind, string> = { posts: 'Top Posts', videos: 'Top V
  * Header side panel: like-ranked entries, maximum 10, no thumbnails, vertical
  * auto-scroll via the shared accessible mechanism.
  *
- * Phase 1B renders the loading/empty presentation honestly — no fabricated
- * engagement data and no animation over skeletons.
+ * Phase 2A renders the honest unavailable presentation: like-ranked ordering
+ * requires engagement reads, which are explicitly out of scope, so no ranking is
+ * fabricated and no like query is issued.
  */
 export function TopListPanel({ kind }: TopListPanelProps) {
   const topPosts = useTopPosts();

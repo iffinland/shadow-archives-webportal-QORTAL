@@ -33,7 +33,7 @@ export const siteConfig = {
   qdnService: 'APP',
   repositoryUrl: 'https://github.com/iffinland/shadow-archives-webportal-QORTAL',
   version: '0.1.0',
-  phaseLabel: 'Phase 1B foundation',
+  phaseLabel: 'Phase 2A read-only pipeline',
 
   /**
    * Primary actions. The published names were verified on 2026-09-11; `verifiedOn`
@@ -62,7 +62,7 @@ export const siteConfig = {
     minItemsForScroll: 5,
   },
 
-  /** Cards are geometry-compatible with the future catalog; Phase 1B renders none. */
+  /** Listing card geometry is driven by validated catalog listings. */
   pageSizes: {
     blog: 10,
     videos: 20,

@@ -7,13 +7,19 @@ import { ContentCard } from './ContentCard';
 import { SectionHeader } from './SectionHeader';
 
 interface LatestVideosSectionProps {
-  /** Test seam; production uses the (currently unavailable) discovery hook. */
+  /** Test seam; production reads the archive snapshot. */
   readonly state?: CollectionState<ContentCardModel>;
 }
 
 export function LatestVideosSection({ state }: LatestVideosSectionProps) {
-  const discovered = useLatestVideos();
-  const data = state ?? discovered;
+  return state ? <LatestVideosView data={state} /> : <LatestVideosConnected />;
+}
+
+function LatestVideosConnected() {
+  return <LatestVideosView data={useLatestVideos()} />;
+}
+
+function LatestVideosView({ data }: { readonly data: CollectionState<ContentCardModel> }) {
   const headingId = 'sa-latest-videos-heading';
 
   return (
@@ -40,7 +46,7 @@ export function LatestVideosSection({ state }: LatestVideosSectionProps) {
           <EmptyState
             icon={<IconVideo width={26} height={26} />}
             title="No videos loaded"
-            description={data.message ?? 'Video discovery arrives with the catalog phase.'}
+            description={data.message ?? 'Video discovery arrives with the archive phase.'}
           />
         )}
       </div>

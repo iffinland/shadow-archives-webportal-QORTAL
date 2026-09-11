@@ -14,8 +14,17 @@ export {
   request,
 } from './bridge';
 export type { RequestOptions } from './bridge';
-export { QortalAction } from './actions';
+export { PERMISSIONED_ACTIONS, PUBLIC_READ_ACTIONS, QortalAction } from './actions';
 export type { QortalActionName, QortalWriteActionName } from './actions';
+export {
+  buildQdnResourcePath,
+  fetchQdnResourceText,
+  getQdnResourceStatus,
+  getQdnResourceUrl,
+  searchQdnResources,
+  toBridgeSearchParams,
+} from './qdn';
+export type { QdnResourceRef, QdnSearchMode, QdnSearchRequest } from './qdn';
 export {
   getAccountNames,
   getNameData,

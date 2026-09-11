@@ -4,7 +4,10 @@ import { LatestVideosSection } from './components/LatestVideosSection';
 
 /**
  * Home route: Latest Posts / Latest Videos columns plus the gallery strip.
- * All regions render honest empty/loading states; nothing is fetched yet.
+ *
+ * Regions read the shared, already-loaded archive snapshot (catalog listings
+ * only), so the home page issues no per-card QDN request and never downloads a
+ * full post body, video bytes or a gallery original.
  */
 export default function HomePage() {
   return (

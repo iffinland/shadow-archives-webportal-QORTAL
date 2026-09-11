@@ -9,8 +9,9 @@ import HomePage from '../../features/home/HomePage';
  * Route boundaries (Phase 1A §4).
  *
  * Only the home route ships in the startup graph. Every other route is a lazy
- * dynamic import, so its module (and any heavy dependency it later gains) is a
- * separate chunk that a visitor pays for only when they navigate there.
+ * dynamic import, so its module (and any heavy dependency it later gains, such as
+ * DOMPurify in the blog detail chunk) is a separate chunk the visitor pays for
+ * only when they navigate there.
  *
  * Owner/studio routes stay entirely outside the visitor startup path and are
  * intentionally not linked from public navigation.
@@ -20,6 +21,8 @@ const BlogPostPage = lazy(() => import('../../features/blog/BlogPostPage'));
 const VideosPage = lazy(() => import('../../features/videos/VideosPage'));
 const VideoDetailPage = lazy(() => import('../../features/videos/VideoDetailPage'));
 const GalleryPage = lazy(() => import('../../features/gallery/GalleryPage'));
+const GalleryAlbumPage = lazy(() => import('../../features/gallery/GalleryAlbumPage'));
+const GalleryItemPage = lazy(() => import('../../features/gallery/GalleryItemPage'));
 const GalleryDetailPage = lazy(() => import('../../features/gallery/GalleryDetailPage'));
 const AboutPage = lazy(() => import('../../features/about/AboutPage'));
 const ContactPage = lazy(() => import('../../features/contact/ContactPage'));
@@ -41,6 +44,9 @@ export const appRoutes: RouteObject[] = [
       { path: 'videos', element: <VideosPage /> },
       { path: 'videos/:id', element: <VideoDetailPage /> },
       { path: 'gallery', element: <GalleryPage /> },
+      { path: 'gallery/album/:id', element: <GalleryAlbumPage /> },
+      { path: 'gallery/item/:id', element: <GalleryItemPage /> },
+      // Legacy Phase 1B generic path; redirects to the canonical item route.
       { path: 'gallery/:id', element: <GalleryDetailPage /> },
       { path: 'about', element: <AboutPage /> },
       { path: 'contact', element: <ContactPage /> },

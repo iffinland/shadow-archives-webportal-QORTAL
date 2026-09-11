@@ -3,11 +3,12 @@ import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
 
 import { renderApp } from '../../test/utils';
+import { makeEnvironment } from '../../test/environment';
 import { LatestPostsSection } from './components/LatestPostsSection';
 
 describe('HomePage', () => {
   it('renders every home region as an honest empty state', async () => {
-    renderApp({ route: '/' });
+    renderApp({ route: '/', environment: makeEnvironment() });
 
     expect(await screen.findByRole('region', { name: 'Latest Posts' })).toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Latest Videos' })).toBeInTheDocument();
@@ -19,11 +20,12 @@ describe('HomePage', () => {
   });
 
   it('does not fabricate engagement counts or QDN content', async () => {
-    renderApp({ route: '/' });
+    renderApp({ route: '/', environment: makeEnvironment() });
 
     await screen.findByRole('region', { name: 'Latest Posts' });
     expect(screen.queryByText(/\d+\s*(likes?|comments?|tips?)/i)).not.toBeInTheDocument();
-    expect(document.querySelectorAll('.sa-card')).toHaveLength(0);
+    // Skeleton shells are loading UI, not content: assert no real card rendered.
+    expect(document.querySelectorAll('.sa-card:not(.sa-card--skeleton)')).toHaveLength(0);
   });
 
   it('renders card geometry when content is supplied (future catalog shape)', () => {

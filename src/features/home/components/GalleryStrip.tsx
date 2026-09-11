@@ -14,18 +14,23 @@ import { useLatestGalleryItems } from '../homeContent';
 import { SectionHeader } from './SectionHeader';
 
 interface GalleryStripProps {
-  /** Test seam; production uses the (currently unavailable) discovery hook. */
+  /** Test seam; production reads the archive snapshot. */
   readonly state?: CollectionState<ContentCardModel>;
 }
 
 /**
- * `LATEST FROM THE GALLERY` — the responsive horizontal strip foundation.
- * Auto-scroll is an enhancement: with no content (Phase 1B) or with reduced
- * motion the strip is a plain, natively scrollable region.
+ * `LATEST FROM THE GALLERY` — responsive horizontal strip. Listings use
+ * thumbnails only; the strip never downloads a gallery original.
  */
 export function GalleryStrip({ state }: GalleryStripProps) {
-  const discovered = useLatestGalleryItems();
-  const data = state ?? discovered;
+  return state ? <GalleryStripView data={state} /> : <GalleryStripConnected />;
+}
+
+function GalleryStripConnected() {
+  return <GalleryStripView data={useLatestGalleryItems()} />;
+}
+
+function GalleryStripView({ data }: { readonly data: CollectionState<ContentCardModel> }) {
   const headingId = 'sa-gallery-strip-heading';
 
   return (
@@ -78,7 +83,7 @@ export function GalleryStrip({ state }: GalleryStripProps) {
             compact
             icon={<IconImage width={24} height={24} />}
             title="No gallery media loaded"
-            description={data.message ?? 'Gallery discovery arrives with the catalog phase.'}
+            description={data.message ?? 'Gallery discovery arrives with the archive phase.'}
           />
         )}
       </div>

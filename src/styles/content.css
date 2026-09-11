@@ -514,3 +514,208 @@
   overflow-wrap: anywhere;
   color: var(--sa-color-danger);
 }
+
+/* ------------------------------------------------ read-only content ------ */
+
+.sa-button--disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.sa-listing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sa-space-3);
+  min-width: 0;
+}
+
+.sa-listing__notice {
+  margin: 0;
+  padding: var(--sa-space-3);
+  color: var(--sa-color-warning);
+  font-size: var(--sa-text-sm);
+  background: var(--sa-color-surface-sunken);
+  border: 1px solid var(--sa-color-border-strong);
+  border-radius: var(--sa-radius-sm);
+}
+
+.sa-listing__pagination {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sa-space-3);
+  align-items: center;
+  justify-content: center;
+}
+
+.sa-listing__page-status {
+  color: var(--sa-color-text-muted);
+  font-size: var(--sa-text-sm);
+}
+
+.sa-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sa-space-4);
+  min-width: 0;
+}
+
+.sa-detail__meta {
+  margin: 0;
+  color: var(--sa-color-text-muted);
+  font-size: var(--sa-text-sm);
+}
+
+.sa-detail__prose {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--sa-color-text-muted);
+  line-height: var(--sa-leading-relaxed);
+}
+
+.sa-detail__media {
+  width: 100%;
+  max-width: 900px;
+}
+
+.sa-taxonomy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sa-space-2);
+}
+
+.sa-taxonomy__chip {
+  padding: 2px var(--sa-space-3);
+  color: var(--sa-color-link);
+  font-size: var(--sa-text-xs);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: var(--sa-color-surface-raised);
+  border: 1px solid var(--sa-color-border-strong);
+  border-radius: var(--sa-radius-pill);
+}
+
+.sa-taxonomy__chip:hover {
+  border-color: var(--sa-color-focus);
+}
+
+.sa-taxonomy__chip--tag {
+  text-transform: none;
+}
+
+/* -------- stored rich text (allowlisted renderer + DOMPurify boundary) --- */
+
+.sa-rich-text__wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sa-space-3);
+  min-width: 0;
+}
+
+.sa-rich-text {
+  max-width: 72ch;
+  color: var(--sa-color-text);
+  line-height: var(--sa-leading-relaxed);
+  overflow-wrap: anywhere;
+}
+
+.sa-rich-text h1,
+.sa-rich-text h2,
+.sa-rich-text h3,
+.sa-rich-text h4,
+.sa-rich-text h5,
+.sa-rich-text h6 {
+  margin: var(--sa-space-5) 0 var(--sa-space-2);
+  color: var(--sa-color-text);
+  font-size: var(--sa-text-xl);
+  letter-spacing: 0.02em;
+}
+
+.sa-rich-text p {
+  margin: 0 0 var(--sa-space-3);
+  color: var(--sa-color-text-muted);
+}
+
+.sa-rich-text ul,
+.sa-rich-text ol {
+  margin: 0 0 var(--sa-space-3);
+  padding-left: var(--sa-space-6);
+  color: var(--sa-color-text-muted);
+}
+
+.sa-rich-text li {
+  margin-bottom: var(--sa-space-1);
+}
+
+.sa-rich-text blockquote {
+  margin: 0 0 var(--sa-space-3);
+  padding-left: var(--sa-space-4);
+  color: var(--sa-color-text-muted);
+  border-left: 3px solid var(--sa-color-accent);
+}
+
+.sa-rich-text pre {
+  margin: 0 0 var(--sa-space-3);
+  padding: var(--sa-space-3);
+  overflow-x: auto;
+  background: var(--sa-color-surface-sunken);
+  border: 1px solid var(--sa-color-border);
+  border-radius: var(--sa-radius-sm);
+}
+
+.sa-rich-text code {
+  font-family: var(--sa-font-mono);
+  font-size: var(--sa-text-sm);
+}
+
+.sa-rich-text img {
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--sa-color-border);
+  border-radius: var(--sa-radius-sm);
+}
+
+.sa-rich-text hr {
+  margin: var(--sa-space-5) 0;
+  border: 0;
+  border-top: 1px solid var(--sa-color-border-strong);
+}
+
+.sa-rich-text a,
+.sa-content-link {
+  color: var(--sa-color-link);
+  text-decoration: underline;
+  text-decoration-color: var(--sa-color-border-strong);
+  cursor: copy;
+}
+
+.sa-rich-text__feedback {
+  padding: var(--sa-space-3);
+  font-size: var(--sa-text-sm);
+  border: 1px solid var(--sa-color-border-strong);
+  border-radius: var(--sa-radius-sm);
+  background: var(--sa-color-surface-sunken);
+}
+
+.sa-rich-text__feedback--copied {
+  color: var(--sa-color-success);
+}
+
+.sa-rich-text__feedback--manual,
+.sa-rich-text__feedback--failed {
+  color: var(--sa-color-warning);
+}
+
+.sa-rich-text__feedback-text {
+  margin: 0 0 var(--sa-space-2);
+}
+
+.sa-rich-text__url {
+  width: 100%;
+  padding: var(--sa-space-2);
+  color: var(--sa-color-text);
+  font-family: var(--sa-font-mono);
+  font-size: var(--sa-text-sm);
+  background: var(--sa-color-bg);
+  border: 1px solid var(--sa-color-border-strong);
+  border-radius: var(--sa-radius-sm);
+}

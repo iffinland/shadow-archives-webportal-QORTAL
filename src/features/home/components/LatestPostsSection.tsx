@@ -7,13 +7,19 @@ import { ContentCard } from './ContentCard';
 import { SectionHeader } from './SectionHeader';
 
 interface LatestPostsSectionProps {
-  /** Test seam; production uses the (currently unavailable) discovery hook. */
+  /** Test seam; production reads the archive snapshot. */
   readonly state?: CollectionState<ContentCardModel>;
 }
 
 export function LatestPostsSection({ state }: LatestPostsSectionProps) {
-  const discovered = useLatestPosts();
-  const data = state ?? discovered;
+  return state ? <LatestPostsView data={state} /> : <LatestPostsConnected />;
+}
+
+function LatestPostsConnected() {
+  return <LatestPostsView data={useLatestPosts()} />;
+}
+
+function LatestPostsView({ data }: { readonly data: CollectionState<ContentCardModel> }) {
   const headingId = 'sa-latest-posts-heading';
 
   return (
