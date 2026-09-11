@@ -14,7 +14,7 @@ const CapabilityContext = createContext<CapabilityContextValue | null>(null);
 
 export function CapabilityProvider({ children }: { children: ReactNode }) {
   const environment = useQortalEnvironment();
-  const { permission, account, ownsPublisherName } = useAuth();
+  const { permission, account, ownsPublisherName, ownsAnyName, ownershipResolved } = useAuth();
 
   const value = useMemo<CapabilityContextValue>(() => {
     const capability = deriveCapability({
@@ -22,10 +22,11 @@ export function CapabilityProvider({ children }: { children: ReactNode }) {
       permission,
       account,
       ownsPublisherName,
-      ownsAnyName: null,
+      ownsAnyName,
+      ownershipResolved,
     });
     return { capability, isOwner: capability === 'owner' };
-  }, [environment, permission, account, ownsPublisherName]);
+  }, [environment, permission, account, ownsPublisherName, ownsAnyName, ownershipResolved]);
 
   return <CapabilityContext.Provider value={value}>{children}</CapabilityContext.Provider>;
 }

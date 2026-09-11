@@ -14,10 +14,24 @@ export type AuthPermissionState = 'idle' | 'pending' | 'granted' | 'rejected' | 
 
 /**
  * Owner-capability states (Phase 1A §11.2). `unknown` is the truthful default
- * outside a Qortal host, in the dev proxy, and while auth is unresolved.
+ * outside a Qortal host, in the dev proxy, and whenever an answer cannot be
+ * established. The first four are transient lifecycle states that let the UI
+ * explain exactly what is happening instead of guessing.
+ *
+ * `permission-denied` is deliberately distinct from `visitor`: a user who
+ * declined the permission dialog is not the same as an unauthenticated visitor.
+ * `error` covers a host/bridge failure and must never be reported as `visitor`.
  */
 export type CapabilityState =
-  'unknown' | 'visitor' | 'authenticated-no-name' | 'authenticated-non-owner' | 'owner';
+  | 'unknown'
+  | 'requesting-permission'
+  | 'resolving-ownership'
+  | 'permission-denied'
+  | 'error'
+  | 'visitor'
+  | 'authenticated-no-name'
+  | 'authenticated-non-owner'
+  | 'owner';
 
 /** QDN environment read from the injected `_qdn*` globals. */
 export interface QdnEnvironment {
@@ -53,7 +67,18 @@ export interface QortalAccount {
   readonly publicKey: string;
 }
 
-/** Minimal `GET_NAME_DATA` shape needed for ownership checks. */
+/**
+ * One entry from `GET_ACCOUNT_NAMES`, which Core serves as
+ * `GET /names/address/{address}` -> `NameSummary[]` (`{name, owner}`).
+ * The owner field is retained so a future acting-name selector can validate a
+ * specific name; multiple names are never collapsed into one identity.
+ */
+export interface QortalNameSummary {
+  readonly name: string;
+  readonly owner: string;
+}
+
+/** Minimal `GET_NAME_DATA` shape needed for ownership checks (`/names/{name}`). */
 export interface QortalNameData {
   readonly name: string;
   readonly owner: string;
@@ -68,4 +93,10 @@ export interface CapabilityInput {
   readonly ownsPublisherName: boolean | null;
   /** True/false when the account owns at least one registered name; null when unresolved. */
   readonly ownsAnyName: boolean | null;
+  /**
+   * True once the account's names/ownership resolution finished, whether it
+   * succeeded or failed. Keeps `resolving-ownership` transient instead of a
+   * permanent lie when a host read fails.
+   */
+  readonly ownershipResolved: boolean;
 }

@@ -26,6 +26,7 @@ export {
 } from './qdn';
 export type { QdnResourceRef, QdnSearchMode, QdnSearchRequest } from './qdn';
 export {
+  encodeNameForLookup,
   getAccountNames,
   getNameData,
   getPrimaryName,
@@ -33,6 +34,7 @@ export {
   requestAccount,
   resetAuthSession,
   resolvePublisherOwnership,
+  retryAccount,
 } from './auth';
 export { deriveCapability, isOwner } from './capability';
 export {
@@ -50,4 +52,5 @@ export type {
   QortalAccount,
   QortalBridgeErrorKind,
   QortalNameData,
+  QortalNameSummary,
 } from './types';
