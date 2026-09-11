@@ -1,0 +1,120 @@
+/*
+ * Shadow Archives semantic design tokens.
+ *
+ * Structure follows the owner-approved Phase 1A token specification: raw palette
+ * -> semantic colour -> elevation/radius/spacing/typography/layout/motion.
+ * Components must consume the semantic layer, never the raw palette.
+ *
+ * Palette values remain PROVISIONAL until the owner supplies the final brand
+ * set; the token NAMES and semantic structure are the durable part.
+ * No web fonts are loaded: the QDN CSP allows only 'self' and data:, and no
+ * font files have been supplied yet, so display/body stacks fall back to
+ * locally available families.
+ */
+:root {
+  /* ---- palette (raw, not used directly in components) ---- */
+  --sa-charcoal-900: #0e0f10;
+  --sa-charcoal-800: #14161a;
+  --sa-charcoal-700: #1b1e23;
+  --sa-grey-600: #2a2e35;
+  --sa-grey-500: #3d434d;
+  --sa-grey-400: #6b7280;
+  --sa-parchment-200: #e8e2d4;
+  --sa-parchment-100: #f2ede1;
+  --sa-cream-50: #f7f3e8;
+  --sa-red-600: #8f2b28;
+  --sa-red-500: #ad3a35;
+  --sa-green-600: #3f6b4a;
+  --sa-amber-500: #b8862b;
+  --sa-blue-600: #2f5d7c;
+
+  /* ---- semantic colour ---- */
+  --sa-color-bg: var(--sa-charcoal-900);
+  --sa-color-surface: var(--sa-charcoal-800);
+  --sa-color-surface-raised: var(--sa-charcoal-700);
+  --sa-color-surface-sunken: #0b0c0e;
+  --sa-color-border: var(--sa-grey-600);
+  --sa-color-border-strong: var(--sa-grey-500);
+  --sa-color-text: var(--sa-cream-50);
+  --sa-color-text-muted: #b9b2a3;
+  --sa-color-text-inverted: #14161a;
+  --sa-color-accent: var(--sa-red-600);
+  --sa-color-accent-hover: var(--sa-red-500);
+  --sa-color-accent-contrast: var(--sa-cream-50);
+  --sa-color-link: var(--sa-parchment-200);
+  --sa-color-success: var(--sa-green-600);
+  --sa-color-warning: var(--sa-amber-500);
+  --sa-color-danger: var(--sa-red-500);
+  --sa-color-info: var(--sa-blue-600);
+  --sa-color-focus: #e0c46a;
+  --sa-color-overlay: rgb(0 0 0 / 0.6);
+
+  /* ---- elevation (restrained; borders do most of the work) ---- */
+  --sa-shadow-0: none;
+  --sa-shadow-1: 0 1px 2px rgb(0 0 0 / 0.35);
+  --sa-shadow-2: 0 2px 6px rgb(0 0 0 / 0.4);
+  --sa-shadow-3: 0 6px 18px rgb(0 0 0 / 0.45);
+  --sa-shadow-inset-paper: inset 0 0 0 1px rgb(232 226 212 / 0.06);
+
+  /* ---- radii ---- */
+  --sa-radius-xs: 2px;
+  --sa-radius-sm: 4px;
+  --sa-radius-md: 6px;
+  --sa-radius-lg: 10px;
+  --sa-radius-pill: 999px;
+
+  /* ---- spacing (4px base) ---- */
+  --sa-space-1: 4px;
+  --sa-space-2: 8px;
+  --sa-space-3: 12px;
+  --sa-space-4: 16px;
+  --sa-space-5: 20px;
+  --sa-space-6: 24px;
+  --sa-space-8: 32px;
+  --sa-space-10: 40px;
+  --sa-space-12: 48px;
+
+  /* ---- typography ---- */
+  --sa-font-display:
+    'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, 'Times New Roman', serif;
+  --sa-font-body: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --sa-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --sa-text-xs: 0.75rem;
+  --sa-text-sm: 0.875rem;
+  --sa-text-base: 1rem;
+  --sa-text-lg: 1.125rem;
+  --sa-text-xl: 1.25rem;
+  --sa-text-2xl: 1.5rem;
+  --sa-text-3xl: 1.875rem;
+  --sa-text-display: clamp(1.75rem, 4vw, 3rem);
+  --sa-leading-tight: 1.2;
+  --sa-leading-normal: 1.5;
+  --sa-leading-relaxed: 1.7;
+
+  /* ---- layout ---- */
+  --sa-shell-inline: 5vw;
+  --sa-shell-max: 1760px;
+  --sa-header-side: 240px;
+  --sa-header-side-lg: 200px;
+  --sa-header-height: 180px;
+  --sa-gallery-tile: 220px;
+  --sa-hit-target: 44px;
+
+  /* ---- motion ---- */
+  --sa-motion-fast: 120ms;
+  --sa-motion-base: 200ms;
+  --sa-motion-slow: 320ms;
+  --sa-motion-easing: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --sa-marquee-vertical: 32s;
+  --sa-marquee-gallery: 60s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sa-motion-fast: 0ms;
+    --sa-motion-base: 0ms;
+    --sa-motion-slow: 0ms;
+    --sa-marquee-vertical: 0s;
+    --sa-marquee-gallery: 0s;
+  }
+}
