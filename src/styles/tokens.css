@@ -5,56 +5,98 @@
  * -> semantic colour -> elevation/radius/spacing/typography/layout/motion.
  * Components must consume the semantic layer, never the raw palette.
  *
- * Palette values remain PROVISIONAL until the owner supplies the final brand
- * set; the token NAMES and semantic structure are the durable part.
+ * Palette is DERIVED FROM THE ACTUAL BANNER ARTWORK
+ * (`src/assets/banner-shadow-archives.webp`), not from generic dark-app
+ * defaults. The system is now PAPER/PARCHMENT-LED: the page is the warm light
+ * beige glow around the hooded figure, panels are the aged paper sheets on the
+ * left and right, inner boxes are the lighter beige around the figure, and the
+ * accent stays the dried-blood oxide red. Sampled evidence (2026-09-11,
+ * read-only ImageMagick/Pillow analysis of specific banner regions):
+ *   - light beige glow around the figure: #dac8a2  (page / inner paper)
+ *   - lit side-paper sheets:              #c9b691 / #d5c4a0
+ *   - side-paper mid tone:                #b59a74 / #a58d6a
+ *   - aged paper deep tan:                #9c7f52 / #b89a6c
+ *   - dark archival ink:                  #1f160b / #241a10
+ *   - dried-blood / oxide red:            #4a2418 / #6e2f22 / #8a3f2c
+ * The banner is a warm sepia document: no dominant blue is introduced, and no
+ * cold grey remains. The lighter tones now carry the surfaces; the dark ink and
+ * oxide reds carry text and accent.
+ *
  * No web fonts are loaded: the QDN CSP allows only 'self' and data:, and no
  * font files have been supplied yet, so display/body stacks fall back to
  * locally available families.
  */
 :root {
   /* ---- palette (raw, not used directly in components) ---- */
-  --sa-charcoal-900: #0e0f10;
-  --sa-charcoal-800: #14161a;
-  --sa-charcoal-700: #1b1e23;
-  --sa-grey-600: #2a2e35;
-  --sa-grey-500: #3d434d;
-  --sa-grey-400: #6b7280;
-  --sa-parchment-200: #e8e2d4;
-  --sa-parchment-100: #f2ede1;
-  --sa-cream-50: #f7f3e8;
-  --sa-red-600: #8f2b28;
-  --sa-red-500: #ad3a35;
-  --sa-green-600: #3f6b4a;
-  --sa-amber-500: #b8862b;
-  --sa-blue-600: #2f5d7c;
+  /* aged paper / parchment: lit highlight -> deep tan. Sampled from the banner's
+     side paper sheets and the light beige glow around the central figure. */
+  --sa-paper-50: #f9f3e3;
+  --sa-paper-100: #f3ead4;
+  --sa-paper-200: #ece0c0;
+  --sa-paper-300: #e2d2ab;
+  --sa-paper-400: #d8c59c;
+  --sa-paper-500: #cfb88c;
+  --sa-paper-600: #b89a6c;
+  --sa-paper-700: #9c7f52;
+  /* archival edge browns: torn/burnt paper and document shadow */
+  --sa-rust-600: #7d6340;
+  --sa-rust-700: #66502f;
+  --sa-rust-800: #52401f;
+  /* dark archival ink (primary text -> muted text) */
+  --sa-ink-900: #1f160b;
+  --sa-ink-800: #2b2011;
+  --sa-ink-700: #3b2c17;
+  --sa-ink-600: #4f3d20;
+  /* stamped oxide / dried-blood reds (accent identity) */
+  --sa-oxide-800: #5a2415;
+  --sa-oxide-700: #4a2418;
+  --sa-oxide-600: #6e2f22;
+  --sa-oxide-500: #8a3f2c;
+  /* warm-archival status distinctions, dark enough to read on light paper */
+  --sa-olive-600: #3a4f24;
+  --sa-amber-700: #6b4a0b;
+  --sa-sand-700: #564832;
+  --sa-danger-600: #8c2c18;
 
   /* ---- semantic colour ---- */
-  --sa-color-bg: var(--sa-charcoal-900);
-  --sa-color-surface: var(--sa-charcoal-800);
-  --sa-color-surface-raised: var(--sa-charcoal-700);
-  --sa-color-surface-sunken: #0b0c0e;
-  --sa-color-border: var(--sa-grey-600);
-  --sa-color-border-strong: var(--sa-grey-500);
-  --sa-color-text: var(--sa-cream-50);
-  --sa-color-text-muted: #b9b2a3;
-  --sa-color-text-inverted: #14161a;
-  --sa-color-accent: var(--sa-red-600);
-  --sa-color-accent-hover: var(--sa-red-500);
-  --sa-color-accent-contrast: var(--sa-cream-50);
-  --sa-color-link: var(--sa-parchment-200);
-  --sa-color-success: var(--sa-green-600);
-  --sa-color-warning: var(--sa-amber-500);
-  --sa-color-danger: var(--sa-red-500);
-  --sa-color-info: var(--sa-blue-600);
-  --sa-color-focus: #e0c46a;
-  --sa-color-overlay: rgb(0 0 0 / 0.6);
+  /* page = light beige glow; surface = paper sheet; surface-strip = the slightly
+   * darker beige used behind section labels (Top Posts / Top Videos); sunken =
+   * inner content/empty boxes (light parchment); raised = small raised cards. */
+  --sa-color-bg: var(--sa-paper-400);
+  --sa-color-surface: var(--sa-paper-300);
+  --sa-color-surface-strip: var(--sa-paper-500);
+  --sa-color-surface-raised: var(--sa-paper-100);
+  --sa-color-surface-raised-hover: var(--sa-paper-50);
+  --sa-color-surface-sunken: var(--sa-paper-200);
+  --sa-color-border: var(--sa-rust-700);
+  --sa-color-border-strong: var(--sa-rust-800);
+  --sa-color-text: var(--sa-ink-900);
+  --sa-color-text-muted: var(--sa-ink-600);
+  --sa-color-text-inverted: var(--sa-paper-100);
+  --sa-color-accent: var(--sa-oxide-600);
+  --sa-color-accent-hover: var(--sa-oxide-500);
+  /* Darker stamped edge used for accent borders. */
+  --sa-color-accent-strong: var(--sa-oxide-700);
+  --sa-color-accent-contrast: var(--sa-paper-100);
+  --sa-color-link: var(--sa-oxide-600);
+  --sa-color-success: var(--sa-olive-600);
+  --sa-color-warning: var(--sa-amber-700);
+  --sa-color-danger: var(--sa-danger-600);
+  --sa-color-info: var(--sa-sand-700);
+  --sa-color-focus: var(--sa-oxide-800);
+  --sa-color-overlay: rgb(31 22 11 / 0.72);
 
-  /* ---- elevation (restrained; borders do most of the work) ---- */
+  /* ---- elevation (warm; restrained drop shadow + lit paper edge) ----
+   * On light paper the drop shadow must stay subtle, so separation comes mostly
+   * from the dark archival border plus `--sa-shadow-inset-paper` (a faint 1px
+   * lit top edge). Level 1 = cards/minor controls; 2 = nav/action row/standard
+   * sections; 3 = header/major content surfaces/prominent panels. */
   --sa-shadow-0: none;
-  --sa-shadow-1: 0 1px 2px rgb(0 0 0 / 0.35);
-  --sa-shadow-2: 0 2px 6px rgb(0 0 0 / 0.4);
-  --sa-shadow-3: 0 6px 18px rgb(0 0 0 / 0.45);
-  --sa-shadow-inset-paper: inset 0 0 0 1px rgb(232 226 212 / 0.06);
+  --sa-shadow-1: 0 1px 2px rgb(74 52 26 / 0.16), 0 1px 3px rgb(74 52 26 / 0.12);
+  --sa-shadow-2: 0 2px 5px rgb(74 52 26 / 0.15), 0 6px 14px rgb(74 52 26 / 0.12);
+  --sa-shadow-3: 0 4px 10px rgb(74 52 26 / 0.16), 0 12px 28px rgb(74 52 26 / 0.13);
+  --sa-shadow-inset-paper:
+    inset 0 1px 0 rgb(255 251 240 / 0.65), inset 0 0 0 1px rgb(82 64 31 / 0.06);
 
   /* ---- radii ---- */
   --sa-radius-xs: 2px;

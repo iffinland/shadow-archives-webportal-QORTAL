@@ -32,19 +32,23 @@
   min-width: 0;
   padding: var(--sa-space-4);
   background: var(--sa-color-surface);
-  border: 1px solid var(--sa-color-border);
+  border: 1px solid var(--sa-color-border-strong);
   border-radius: var(--sa-radius-lg);
   box-shadow: var(--sa-shadow-2), var(--sa-shadow-inset-paper);
 }
 
 .sa-section__header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--sa-space-3);
   margin-bottom: var(--sa-space-4);
-  padding-bottom: var(--sa-space-2);
-  border-bottom: 1px solid var(--sa-color-border);
+  /* Same heading-strip treatment as Top Posts / Top Videos: a slightly darker
+   * beige label bar so the two families stay visually consistent. */
+  padding: var(--sa-space-2) var(--sa-space-3);
+  background: var(--sa-color-surface-strip);
+  border: 1px solid var(--sa-color-border);
+  border-radius: var(--sa-radius-sm);
 }
 
 .sa-section__title {
@@ -94,7 +98,7 @@
   background: var(--sa-color-surface-raised);
   border: 1px solid var(--sa-color-border);
   border-radius: var(--sa-radius-md);
-  box-shadow: var(--sa-shadow-1);
+  box-shadow: var(--sa-shadow-1), var(--sa-shadow-inset-paper);
 }
 
 .sa-card__media-link {
@@ -124,7 +128,7 @@
   padding: 2px var(--sa-space-2);
   border-radius: var(--sa-radius-sm);
   background: var(--sa-color-overlay);
-  color: var(--sa-color-text);
+  color: var(--sa-color-text-inverted);
   font-size: var(--sa-text-xs);
   font-variant-numeric: tabular-nums;
 }
@@ -324,7 +328,7 @@
   background: linear-gradient(
     90deg,
     var(--sa-color-surface-raised) 0%,
-    var(--sa-grey-500) 50%,
+    var(--sa-color-surface-strip) 50%,
     var(--sa-color-surface-raised) 100%
   );
   background-size: 200% 100%;
@@ -365,7 +369,7 @@
   padding: var(--sa-space-5);
   border: 1px dashed var(--sa-color-border-strong);
   border-radius: var(--sa-radius-md);
-  background: color-mix(in srgb, var(--sa-color-surface-sunken) 75%, transparent);
+  background: var(--sa-color-surface-sunken);
   color: var(--sa-color-text-muted);
 }
 
@@ -410,9 +414,9 @@
   min-width: 0;
   padding: var(--sa-space-5);
   background: var(--sa-color-surface);
-  border: 1px solid var(--sa-color-border);
+  border: 1px solid var(--sa-color-border-strong);
   border-radius: var(--sa-radius-lg);
-  box-shadow: var(--sa-shadow-2), var(--sa-shadow-inset-paper);
+  box-shadow: var(--sa-shadow-3), var(--sa-shadow-inset-paper);
 }
 
 .sa-route__title {
@@ -490,7 +494,7 @@
   padding: var(--sa-space-5);
   border: 1px solid var(--sa-color-border-strong);
   border-radius: var(--sa-radius-md);
-  background: color-mix(in srgb, var(--sa-color-surface-sunken) 70%, transparent);
+  background: var(--sa-color-surface-sunken);
 }
 
 .sa-studio__status {

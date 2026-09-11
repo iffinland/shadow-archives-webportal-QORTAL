@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { screen, within } from '@testing-library/react';
 
+import { buildInfo } from '../../build/buildInfo';
 import { renderApp } from '../../test/utils';
 
 describe('AppShell', () => {
@@ -75,5 +76,27 @@ describe('AppShell', () => {
     renderApp({ route: '/' });
 
     expect(screen.queryByRole('link', { name: /studio/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the full primary site navigation in the shell', () => {
+    renderApp({ route: '/' });
+
+    const nav = screen.getByRole('navigation', { name: 'Site sections' });
+    for (const label of ['Home', 'Blog', 'Videos', 'Gallery', 'About', 'Contact']) {
+      expect(within(nav).getByRole('link', { name: label })).toBeInTheDocument();
+    }
+  });
+
+  it('renders a minimal footer with no navigation, route links or repository URL', () => {
+    renderApp({ route: '/' });
+
+    const footer = screen.getByRole('contentinfo');
+    expect(within(footer).queryAllByRole('link')).toHaveLength(0);
+    expect(within(footer).queryByRole('navigation')).not.toBeInTheDocument();
+    expect(footer.querySelector('a')).toBeNull();
+    expect(footer).not.toHaveTextContent('github.com');
+    expect(footer).not.toHaveTextContent('Sections');
+    expect(footer).toHaveTextContent('Decentralized on Qortal');
+    expect(footer).toHaveTextContent(`Build v${buildInfo.version}`);
   });
 });
