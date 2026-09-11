@@ -33,7 +33,7 @@ export const siteConfig = {
   qdnService: 'APP',
   repositoryUrl: 'https://github.com/iffinland/shadow-archives-webportal-QORTAL',
   version: '0.1.0',
-  phaseLabel: 'Phase 2A read-only pipeline',
+  phaseLabel: 'Phase 2C-A publication-readiness build',
 
   /**
    * Primary actions. The published names were verified on 2026-09-11; `verifiedOn`

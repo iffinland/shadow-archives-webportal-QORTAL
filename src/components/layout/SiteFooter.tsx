@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 
 import { routes } from '../../app/config/navigation';
 import { siteConfig } from '../../app/config/siteConfig';
+import { buildInfo } from '../../build/buildInfo';
 
 /**
  * Elevated footer: archive metadata, a small link group and the provenance
@@ -47,7 +48,7 @@ export function SiteFooter() {
             QDN service <code>{siteConfig.qdnService}</code>
           </p>
           <p className="sa-site-footer__text">
-            {siteConfig.phaseLabel} · v{siteConfig.version}
+            Build v{buildInfo.version} · <code>{buildInfo.commitShort}</code>
           </p>
           <p className="sa-site-footer__text sa-site-footer__repo">{siteConfig.repositoryUrl}</p>
         </div>

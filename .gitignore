@@ -6,6 +6,9 @@ dist/
 dist-ssr/
 *.local
 
+# generated QDN publication artifacts (never committed; see release policy)
+release/
+
 # logs
 logs/
 *.log

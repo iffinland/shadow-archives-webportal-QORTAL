@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useCapability } from '../../app/providers/CapabilityProvider';
 import { useQortalEnvironment } from '../../app/providers/BridgeProvider';
+import { buildInfo } from '../../build/buildInfo';
 import { Button } from '../../components/common/Button';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { ErrorState } from '../../components/feedback/ErrorState';
@@ -257,6 +258,10 @@ export default function StudioPage() {
       ) : (
         renderCapability(capability)
       )}
+
+      <p className="sa-route__provenance">
+        Served build v{buildInfo.version} · <code>{buildInfo.commitShort}</code>
+      </p>
     </div>
   );
 }
