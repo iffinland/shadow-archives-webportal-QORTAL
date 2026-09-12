@@ -7,7 +7,7 @@ import { buildInfo } from '../../build/buildInfo';
 import { Button } from '../../components/common/Button';
 import { EmptyState } from '../../components/feedback/EmptyState';
 import { ErrorState } from '../../components/feedback/ErrorState';
-import type { CapabilityState } from '../../qortal/types';
+import type { CapabilityState, QdnEnvironment } from '../../qortal/types';
 
 /**
  * Owner / Studio capability shell.
@@ -43,6 +43,46 @@ function CapabilityDetails({ rows }: { readonly rows: readonly DetailRow[] }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+/** Render an injected `_qdn*` value without inventing a missing one. */
+function describeInjected(value: string | null | undefined): string {
+  if (value === null || value === undefined) return 'not injected';
+  if (value === '') return 'empty string';
+  return value;
+}
+
+/**
+ * Read-only host-context diagnostics.
+ *
+ * Shows only the non-secret `_qdn*` values Qortal Core injects into the rendered
+ * frame, so the owner can confirm the real host context (`service`, `name`,
+ * `identifier`, `context`, `base`, `baseWithPath`) without browser devtools.
+ * It reads nothing from the host: no account request, no QDN read, no write,
+ * and no secret or account data is displayed.
+ */
+function HostContextDiagnostics({ environment }: { readonly environment: QdnEnvironment }) {
+  const rows: DetailRow[] = [
+    { label: 'Bridge available', value: environment.bridgeAvailable ? 'yes' : 'no' },
+    { label: '_qdnService', value: describeInjected(environment.service) },
+    { label: '_qdnName', value: describeInjected(environment.name) },
+    { label: '_qdnIdentifier', value: describeInjected(environment.identifier) },
+    { label: '_qdnContext', value: describeInjected(environment.context) },
+    { label: '_qdnBase', value: describeInjected(environment.base) },
+    { label: '_qdnBaseWithPath', value: describeInjected(environment.baseWithPath) },
+  ];
+
+  return (
+    <details className="sa-studio">
+      <summary className="sa-studio__status">Host context diagnostics</summary>
+      <p className="sa-studio__body">
+        Non-secret values injected by the Qortal host for this frame. They identify which resource,
+        identifier and route path the app is rendered from. This block issues no host request and
+        displays no account data.
+      </p>
+      <CapabilityDetails rows={rows} />
+    </details>
   );
 }
 
@@ -258,6 +298,8 @@ export default function StudioPage() {
       ) : (
         renderCapability(capability)
       )}
+
+      <HostContextDiagnostics environment={environment} />
 
       <p className="sa-route__provenance">
         Served build v{buildInfo.version} · <code>{buildInfo.commitShort}</code>

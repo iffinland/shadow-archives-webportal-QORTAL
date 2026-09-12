@@ -302,3 +302,61 @@ describe('StudioPage — development contexts', () => {
     expect(screen.queryByRole('button', { name: 'Enter owner mode' })).not.toBeInTheDocument();
   });
 });
+
+describe('StudioPage — host context diagnostics', () => {
+  function diagnosticsPanel(): ReturnType<typeof within> {
+    const summary = screen.getByText('Host context diagnostics');
+    const details = summary.closest('details');
+    expect(details).not.toBeNull();
+    return within(details as HTMLElement);
+  }
+
+  it('reports the injected non-secret QDN context without contacting the host', async () => {
+    const bridge = installHostBridge();
+    renderApp({
+      route: '/studio',
+      environment: makeEnvironment({
+        bridgeAvailable: true,
+        isHosted: true,
+        context: 'render',
+        service: 'APP',
+        name: 'Shadow%20Archives',
+        publisherName: 'Shadow Archives',
+        identifier: 'default',
+        base: '/render/APP/Shadow%20Archives',
+        baseWithPath: '/render/APP/Shadow%20Archives/studio',
+      }),
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Owner studio' });
+
+    const panel = diagnosticsPanel();
+    expect(panel.getByText('_qdnService')).toBeInTheDocument();
+    expect(panel.getByText('_qdnName')).toBeInTheDocument();
+    expect(panel.getByText('_qdnIdentifier')).toBeInTheDocument();
+    expect(panel.getByText('_qdnContext')).toBeInTheDocument();
+    expect(panel.getByText('_qdnBase')).toBeInTheDocument();
+    expect(panel.getByText('_qdnBaseWithPath')).toBeInTheDocument();
+    expect(panel.getByText('APP')).toBeInTheDocument();
+    expect(panel.getByText('Shadow%20Archives')).toBeInTheDocument();
+    expect(panel.getByText('default')).toBeInTheDocument();
+    expect(panel.getByText('render')).toBeInTheDocument();
+    expect(panel.getByText('/render/APP/Shadow%20Archives')).toBeInTheDocument();
+    expect(panel.getByText('/render/APP/Shadow%20Archives/studio')).toBeInTheDocument();
+    expect(panel.getByText('yes')).toBeInTheDocument();
+
+    // Diagnostics never authenticate: permission stays untouched. Public,
+    // approval-free archive reads are unaffected by this block.
+    expect(accountCalls(bridge)).toHaveLength(0);
+  });
+
+  it('marks absent injected values instead of inventing them', async () => {
+    renderApp({ route: '/studio', environment: makeEnvironment() });
+    await screen.findByRole('heading', { level: 1, name: 'Owner studio' });
+
+    const panel = diagnosticsPanel();
+    expect(panel.getByText('no')).toBeInTheDocument();
+    expect(panel.getAllByText('not injected').length).toBeGreaterThanOrEqual(5);
+    expect(panel.getByText('empty string')).toBeInTheDocument();
+    expect(panel.queryByText('APP')).not.toBeInTheDocument();
+  });
+});
