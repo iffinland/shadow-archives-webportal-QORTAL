@@ -33,12 +33,49 @@ export type CapabilityState =
   | 'authenticated-non-owner'
   | 'owner';
 
+/**
+ * Explicit runtime states. These MUST NOT be collapsed into each other: a
+ * Qortal-served frame without a host bridge is a real published read-only
+ * runtime, not a plain browser.
+ *
+ * - `plain-browser` — no injected `_qdn*` identity and no bridge: not running
+ *   inside Qortal at all.
+ * - `qortal-render-readonly` — a `render`/`gateway`/`domainMap` frame with
+ *   injected `_qdn*` identity but no reachable host bridge. The publishing
+ *   identity is still real, so read-only scoping works; owner/auth/write do not.
+ * - `qortal-host` — injected `_qdn*` identity *and* a reachable bridge. Read-only
+ *   plus owner capability, after an explicit permission and ownership proof.
+ * - `qortal-dev-proxy` — the node development proxy. It injects `_qdn*` values
+ *   but carries no deployed resource identity, so identity is not authoritative.
+ * - `qortal-bridge-unidentified` — a bridge is reachable but no `_qdn*` identity
+ *   was injected. Kept separate so it is never reported as a published identity.
+ */
+export type QortalRuntimeState =
+  | 'plain-browser'
+  | 'qortal-render-readonly'
+  | 'qortal-host'
+  | 'qortal-dev-proxy'
+  | 'qortal-bridge-unidentified';
+
 /** QDN environment read from the injected `_qdn*` globals. */
 export interface QdnEnvironment {
-  /** True when a `qortalRequest` bridge function is present. */
+  /**
+   * True when a callable `qortalRequest` bridge is reachable — either as
+   * `window.qortalRequest` or as the bare global binding created by the injected
+   * `q-apps.js` classic script, which is the authoritative mechanism on Core
+   * v6.1.9. Never conflate this with "is a published runtime".
+   */
   readonly bridgeAvailable: boolean;
-  /** True when Core/`q-apps.js` injected QDN context (i.e. hosted render). */
+  /**
+   * True when a Qortal runtime served this document (any injected `_qdn*` value).
+   * Independent of the bridge: a published render context stays hosted even when
+   * the host bridge is unavailable.
+   */
   readonly isHosted: boolean;
+  /** True when `_qdnName` resolved to a non-empty publishing name. */
+  readonly hasQdnIdentity: boolean;
+  /** The explicit runtime state; see `QortalRuntimeState`. */
+  readonly runtimeState: QortalRuntimeState;
   /** `_qdnContext` as injected, or null. */
   readonly context: string | null;
   /** True when `_qdnContext === 'proxy'` (node dev proxy — no real publisher). */

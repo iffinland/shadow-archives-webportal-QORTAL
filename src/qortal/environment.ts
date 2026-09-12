@@ -1,4 +1,8 @@
-import type { QdnEnvironment } from './types';
+import { hasQortalBridge } from './bridgeGlobal';
+import type { QdnEnvironment, QortalRuntimeState } from './types';
+
+export { hasQortalBridge, resolveQortalRequest } from './bridgeGlobal';
+export type { QortalRequestFunction } from './bridgeGlobal';
 
 function readString(value: unknown): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value : null;
@@ -21,9 +25,26 @@ export function decodeQdnName(raw: string | null | undefined): string | null {
   }
 }
 
-/** True when a `qortalRequest` bridge function is available on the given window. */
-export function hasQortalBridge(target: Window = window): boolean {
-  return typeof target.qortalRequest === 'function';
+export interface RuntimeStateInput {
+  readonly bridgeAvailable: boolean;
+  /** True when any `_qdn*` value was injected (the frame was served by Qortal). */
+  readonly isQortalFrame: boolean;
+  readonly isProxy: boolean;
+}
+
+/**
+ * The single derivation of the explicit runtime state.
+ *
+ * This is the rule that must never be collapsed: `isQortalFrame && !bridge`
+ * (a published read-only render context) is a *different* state from
+ * `!isQortalFrame && !bridge` (a plain browser).
+ */
+export function deriveRuntimeState(input: RuntimeStateInput): QortalRuntimeState {
+  if (input.isProxy) return 'qortal-dev-proxy';
+  if (input.isQortalFrame) {
+    return input.bridgeAvailable ? 'qortal-host' : 'qortal-render-readonly';
+  }
+  return input.bridgeAvailable ? 'qortal-bridge-unidentified' : 'plain-browser';
 }
 
 /**
@@ -33,18 +54,29 @@ export function hasQortalBridge(target: Window = window): boolean {
 export function readQdnEnvironment(target: Window = window): QdnEnvironment {
   const context = readString(target._qdnContext);
   const rawName = readString(target._qdnName);
+  const service = readString(target._qdnService);
+  const publisherName = decodeQdnName(rawName);
   const bridgeAvailable = hasQortalBridge(target);
   const base = readString(target._qdnBase) ?? '';
   const baseWithPath = readString(target._qdnBaseWithPath);
 
+  // Any injected `_qdn*` value proves a Qortal runtime served this document.
+  // Core's HTMLParser always writes `_qdnContext` and `_qdnService`, so this is
+  // true for `render`, `gateway`, `domainMap` and the node dev proxy, and false
+  // in a plain browser.
+  const isQortalFrame = context !== null || rawName !== null || service !== null;
+  const isProxy = context === 'proxy';
+
   return Object.freeze({
     bridgeAvailable,
-    isHosted: bridgeAvailable && (context !== null || rawName !== null),
+    isHosted: isQortalFrame,
+    hasQdnIdentity: publisherName !== null && publisherName.trim().length > 0,
+    runtimeState: deriveRuntimeState({ bridgeAvailable, isQortalFrame, isProxy }),
     context,
-    isProxy: context === 'proxy',
-    service: readString(target._qdnService),
+    isProxy,
+    service,
     name: rawName,
-    publisherName: decodeQdnName(rawName),
+    publisherName,
     identifier: readString(target._qdnIdentifier),
     path: readString(target._qdnPath),
     lang: readString(target._qdnLang),

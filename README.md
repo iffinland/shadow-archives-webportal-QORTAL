@@ -54,12 +54,21 @@ src/
 
 `src/qortal/` owns every platform interaction:
 
-- `environment.ts` reads the injected `_qdn*` context once and decodes
-  `_qdnName` (`Shadow%20Archives` → `Shadow Archives`); `getRouterBasename()`
-  supplies the router basename.
-- `bridge.ts` is the only module that calls `window.qortalRequest`, with a
-  timeout and an error taxonomy (`unavailable`, `malformed`, `timeout`,
-  `rejected`, `error`).
+- `environment.ts` reads the injected `_qdn*` context once, decodes `_qdnName`
+  (`Shadow%20Archives` → `Shadow Archives`) and derives the explicit runtime
+  state: `plain-browser`, `qortal-render-readonly`, `qortal-host`,
+  `qortal-dev-proxy`, `qortal-bridge-unidentified`. A published render context
+  without a host bridge is a real read-only runtime and is never reported as a
+  plain browser. `getRouterBasename()` supplies the router basename.
+- `bridgeGlobal.ts` resolves the injected bridge. Core v6.1.9 declares it as a
+  top-level `const` in the classic `q-apps.js`, so it is reachable as the bare
+  global `qortalRequest` but is **not** a `window` property; both access styles
+  are supported. `bridge.ts` is the only module that calls it, with a timeout and
+  an error taxonomy (`unavailable`, `malformed`, `timeout`, `rejected`, `error`).
+- `services/readPort.ts` selects the read transport from the runtime state: the
+  injected bridge when reachable, otherwise the verified same-origin REST routes
+  the shim itself uses (`/arbitrary/resources/search`, `/arbitrary/{service}/{name}`).
+  This fallback is read-only; writes stay bridge-only and owner-gated.
 - `auth.ts` implements single-flight `GET_USER_ACCOUNT` with a session-cached
   rejection. It is **not** called at startup: the visitor shell never opens a
   permission dialog.

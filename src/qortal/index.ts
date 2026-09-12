@@ -1,11 +1,14 @@
 export {
   decodeQdnName,
+  deriveRuntimeState,
   getQdnEnvironment,
   getRouterBasename,
   hasQortalBridge,
   readQdnEnvironment,
   resetQdnEnvironmentCache,
+  resolveQortalRequest,
 } from './environment';
+export type { QortalRequestFunction, RuntimeStateInput } from './environment';
 export {
   DEFAULT_REQUEST_TIMEOUT_MS,
   PERMISSION_REQUEST_TIMEOUT_MS,
@@ -18,6 +21,9 @@ export { PERMISSIONED_ACTIONS, PUBLIC_READ_ACTIONS, QortalAction } from './actio
 export type { QortalActionName, QortalWriteActionName } from './actions';
 export {
   buildQdnResourcePath,
+  buildSameOriginSearchPath,
+  buildSameOriginStatusPath,
+  toSameOriginSearchQuery,
   fetchQdnResourceText,
   getQdnResourceStatus,
   getQdnResourceUrl,
@@ -36,7 +42,7 @@ export {
   resolvePublisherOwnership,
   retryAccount,
 } from './auth';
-export { deriveCapability, isOwner } from './capability';
+export { deriveCapability, isOwner, isOwnerCapableRuntime } from './capability';
 export {
   buildQortalAppUrl,
   qortalAppIdFromName,
@@ -50,6 +56,7 @@ export type {
   CapabilityState,
   QdnEnvironment,
   QortalAccount,
+  QortalRuntimeState,
   QortalBridgeErrorKind,
   QortalNameData,
   QortalNameSummary,

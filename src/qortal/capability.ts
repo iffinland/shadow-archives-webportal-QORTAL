@@ -1,12 +1,26 @@
-import type { CapabilityInput, CapabilityState } from './types';
+import type { CapabilityInput, CapabilityState, QdnEnvironment } from './types';
+
+/**
+ * True only for the fully capable runtime state: a Qortal-served frame that has
+ * a reachable host bridge and a real deployed resource identity.
+ *
+ * This is the single gate for owner/write capability. Read-only scope is
+ * deliberately NOT gated on it (see `resolvePublisherScope`): a published
+ * `qortal-render-readonly` frame can browse, but it can never own or write.
+ */
+export function isOwnerCapableRuntime(environment: QdnEnvironment): boolean {
+  return environment.runtimeState === 'qortal-host';
+}
 
 /**
  * Pure derivation of the owner-capability state from environment + resolved
  * permission/identity (Phase 1A §11.2).
  *
  * Rules, in order:
- * 1. No bridge, or the node dev-proxy context, cannot establish a real
- *    deployed publishing identity -> `unknown` (never owner).
+ * 1. Only a `qortal-host` runtime (bridge + injected `_qdn*` identity, not the
+ *    dev proxy) can establish owner capability. A published read-only render
+ *    context, a plain browser and the dev proxy all resolve to `unknown`
+ *    (never owner), because none of them can prove authorisation.
  * 2. The auth lifecycle maps to truthful transient states.
  * 3. Owner is reported only when the connected account's address provably
  *    equals the *current* owner of the decoded `_qdnName`.
@@ -19,7 +33,7 @@ export function deriveCapability(input: CapabilityInput): CapabilityState {
   const { environment, permission, account, ownsPublisherName, ownsAnyName, ownershipResolved } =
     input;
 
-  if (!environment.bridgeAvailable || environment.isProxy) return 'unknown';
+  if (!isOwnerCapableRuntime(environment)) return 'unknown';
 
   switch (permission) {
     case 'idle':

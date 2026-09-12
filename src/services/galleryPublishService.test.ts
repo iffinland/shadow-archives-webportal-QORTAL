@@ -409,6 +409,30 @@ describe('publishGalleryImage — authority', () => {
     expect(writer.calls).toHaveLength(0);
   });
 
+  it('refuses to publish in a published read-only context (no bridge), even for an owner capability', async () => {
+    const writer = writerFake();
+    const deps = makeDeps({ writer: writer.port });
+    installNameBridge();
+
+    await expect(
+      publishGalleryImage(
+        ownerContext({
+          // The read-only fallback transport must never authorise a write.
+          environment: makeEnvironment({
+            context: 'render',
+            service: 'APP',
+            name: 'Shadow%20Archives',
+            publisherName: PUBLISHER,
+          }),
+        }),
+        imageDraft(),
+        {},
+        deps,
+      ),
+    ).rejects.toMatchObject({ code: 'not-hosted' });
+    expect(writer.calls).toHaveLength(0);
+  });
+
   it('re-checks name ownership immediately before every write stage', async () => {
     const writer = writerFake();
     const deps = makeDeps({ writer: writer.port });

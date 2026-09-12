@@ -298,8 +298,42 @@ describe('StudioPage — development contexts', () => {
     renderApp({ route: '/studio', environment: makeEnvironment() });
     await screen.findByRole('heading', { level: 1, name: 'Owner studio' });
 
-    expect(screen.getByText('Not running in a Qortal host')).toBeInTheDocument();
+    expect(screen.getByText('Plain browser — no Qortal context')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Enter owner mode' })).not.toBeInTheDocument();
+  });
+
+  it('explains the observed published render runtime without a bridge truthfully', async () => {
+    // The exact owner-reported runtime: injected _qdn* identity, no bridge.
+    const bridge = installHostBridge();
+    renderApp({
+      route: '/studio',
+      environment: makeEnvironment({
+        context: 'render',
+        service: 'APP',
+        name: 'Shadow%20Archives',
+        publisherName: 'Shadow Archives',
+        identifier: null,
+        base: '/render/APP/Shadow%20Archives',
+        baseWithPath: '/render/APP/Shadow%20Archives',
+      }),
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Owner studio' });
+
+    // Truthful read-only messaging: published context, identity detected,
+    // read-only browsing available, owner mode unavailable for a stated reason.
+    const panel = within(screen.getByLabelText('Owner studio status'));
+    expect(panel.getByText('Published in a Qortal render context — read-only')).toBeInTheDocument();
+    expect(panel.getByText('Shadow Archives')).toBeInTheDocument();
+    expect(panel.getByText('APP')).toBeInTheDocument();
+    expect(panel.getByText('render')).toBeInTheDocument();
+    expect(panel.getByText('unavailable in this frame')).toBeInTheDocument();
+    expect(panel.getByText(/no account request is made/i)).toBeInTheDocument();
+
+    // Never the misleading collapse into "plain browser / not a Qortal host".
+    expect(screen.queryByText('Plain browser — no Qortal context')).not.toBeInTheDocument();
+    expect(screen.queryByText('Not running in a Qortal host')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Enter owner mode' })).not.toBeInTheDocument();
+    expect(accountCalls(bridge)).toHaveLength(0);
   });
 });
 

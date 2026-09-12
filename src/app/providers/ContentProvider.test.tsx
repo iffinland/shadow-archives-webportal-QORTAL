@@ -8,6 +8,16 @@ import { makeEnvironment } from '../../test/environment';
 import { makeArchiveSnapshot, makeListingFixture } from '../../test/fixtures/content';
 import type { ArchiveSnapshot, LoadArchiveOptions, PublisherScope } from '../../services';
 
+/** The exact `_qdn*` values the owner's published runtime reported, no bridge. */
+const PUBLISHED_RENDER_NO_BRIDGE = makeEnvironment({
+  context: 'render',
+  service: 'APP',
+  name: 'Shadow%20Archives',
+  publisherName: 'Shadow Archives',
+  base: '/render/APP/Shadow%20Archives',
+  baseWithPath: '/render/APP/Shadow%20Archives',
+});
+
 const HOSTED = makeEnvironment({
   bridgeAvailable: true,
   isHosted: true,
@@ -24,6 +34,7 @@ function Probe() {
     <div>
       <span data-testid="status">{snapshot.status}</span>
       <span data-testid="scoped">{scope.scoped ? 'yes' : 'no'}</span>
+      <span data-testid="message">{snapshot.message ?? ''}</span>
     </div>
   );
 }
@@ -42,8 +53,17 @@ function renderProvider(loader?: Loader) {
 
 afterEach(() => {
   resetContentCache();
+  vi.unstubAllGlobals();
   Reflect.deleteProperty(window, 'qortalRequest');
 });
+
+function jsonResponse(body: unknown) {
+  return {
+    ok: true,
+    status: 200,
+    text: () => Promise.resolve(JSON.stringify(body)),
+  };
+}
 
 describe('ContentProvider', () => {
   it('exposes the loader snapshot and starts in the loading state', async () => {
@@ -72,6 +92,35 @@ describe('ContentProvider', () => {
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unavailable'));
     expect(screen.getByTestId('scoped')).toHaveTextContent('no');
     expect(loader).not.toHaveBeenCalled();
+    expect(screen.getByTestId('message')).toHaveTextContent('not running inside a Qortal runtime');
+  });
+
+  it('scopes a published render context and reads it over same-origin REST without a bridge', async () => {
+    // The verified shim read routes are same-origin, so the node that served the
+    // document can answer them even when the host bridge is unreachable.
+    const fetchMock = vi.fn(() => Promise.resolve(jsonResponse([])));
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <BridgeProvider environment={PUBLISHED_RENDER_NO_BRIDGE}>
+        <ContentProvider>
+          <Probe />
+        </ContentProvider>
+      </BridgeProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByTestId('status')).not.toHaveTextContent('loading'));
+
+    expect(screen.getByTestId('scoped')).toHaveTextContent('yes');
+    // Discovery completed (bounded live search found nothing) — never the old
+    // "no publisher identity" unavailable state.
+    expect(screen.getByTestId('status')).not.toHaveTextContent('unavailable');
+    expect(screen.getByTestId('message')).not.toHaveTextContent(
+      'No production Qortal publisher identity',
+    );
+    expect(fetchMock).toHaveBeenCalled();
+    const urls = fetchMock.mock.calls.map((call) => String((call as unknown[])[0]));
+    for (const url of urls) expect(url.startsWith('/arbitrary/')).toBe(true);
   });
 
   it('surfaces a loader crash as an error snapshot rather than an empty archive', async () => {

@@ -24,8 +24,8 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-const SCOPED: PublisherScope = { scoped: true, name: TEST_PUBLISHER };
-const UNSCOPED: PublisherScope = { scoped: false, reason: 'no-bridge' };
+const SCOPED: PublisherScope = { scoped: true, name: TEST_PUBLISHER, service: 'DOCUMENT' };
+const UNSCOPED: PublisherScope = { scoped: false, reason: 'no-qortal-context' };
 const NOW = 1_700_001_000_000;
 
 function makeListing(overrides: Partial<CatalogListing> = {}): CatalogListing {

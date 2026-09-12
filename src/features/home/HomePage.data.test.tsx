@@ -11,6 +11,19 @@ import {
   makeListingFixture,
 } from '../../test/fixtures/content';
 
+/**
+ * The exact `_qdn*` values the owner's published APP reported, with no bridge.
+ * The publishing identity is real, so read-side scoping must proceed.
+ */
+const PUBLISHED_RENDER_NO_BRIDGE = makeEnvironment({
+  context: 'render',
+  service: 'APP',
+  name: 'Shadow%20Archives',
+  publisherName: 'Shadow Archives',
+  base: '/render/APP/Shadow%20Archives',
+  baseWithPath: '/render/APP/Shadow%20Archives',
+});
+
 const HOSTED = makeEnvironment({
   bridgeAvailable: true,
   isHosted: true,
@@ -119,5 +132,50 @@ describe('HomePage with a validated archive snapshot', () => {
       (await screen.findAllByText('The archive catalog could not be read.')).length,
     ).toBeGreaterThan(0);
     expect(document.querySelectorAll('.sa-card:not(.sa-card--skeleton)')).toHaveLength(0);
+  });
+});
+
+describe('published render runtime without a bridge', () => {
+  const NO_PUBLISHER_CLAIM = /no production Qortal publisher identity/i;
+
+  it('renders Home content from the injected publishing identity', async () => {
+    renderApp({ route: '/', environment: PUBLISHED_RENDER_NO_BRIDGE, archiveLoader: loader });
+
+    const posts = await screen.findByRole('region', { name: 'Latest Posts' });
+    expect(within(posts).getByRole('link', { name: 'Redaction notes' })).toBeInTheDocument();
+    expect(screen.queryByText(NO_PUBLISHER_CLAIM)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not running inside a Qortal runtime/i)).not.toBeInTheDocument();
+  });
+
+  it('renders the Gallery listing instead of refusing to scope QDN content', async () => {
+    renderApp({
+      route: '/gallery',
+      environment: PUBLISHED_RENDER_NO_BRIDGE,
+      archiveLoader: loader,
+    });
+
+    await screen.findByRole('heading', { level: 1, name: 'Gallery' });
+    expect(await screen.findByRole('link', { name: /Plate 01/ })).toBeInTheDocument();
+    expect(screen.queryByText(NO_PUBLISHER_CLAIM)).not.toBeInTheDocument();
+
+    // Read-only stays read-only: no owner affordance may appear without a bridge.
+    expect(screen.queryByRole('button', { name: 'Add image' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Create album' })).not.toBeInTheDocument();
+  });
+
+  it('renders Blog and Videos listings from the injected identity', async () => {
+    for (const [route, heading] of [
+      ['/blog', 'Blog'],
+      ['/videos', 'Videos'],
+    ] as const) {
+      const view = renderApp({
+        route,
+        environment: PUBLISHED_RENDER_NO_BRIDGE,
+        archiveLoader: loader,
+      });
+      await screen.findByRole('heading', { level: 1, name: heading });
+      expect(screen.queryByText(NO_PUBLISHER_CLAIM)).not.toBeInTheDocument();
+      view.unmount();
+    }
   });
 });

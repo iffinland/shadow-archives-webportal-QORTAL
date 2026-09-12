@@ -9,7 +9,7 @@ import { ContentError, toContentError } from './errors';
 import { discoverArchive } from './fallbackDiscovery';
 import { entityIdentifierMatches, findExactResource } from './identity';
 import { bridgeQdnReadPort, parseJsonPayload, type QdnReadPort } from './qdnReader';
-import { UNSCOPED_MESSAGE, type PublisherScope } from './publisher';
+import { unscopedMessage, type PublisherScope } from './publisher';
 import type { ArchiveDiagnostic, ArchiveSnapshot, EntityDetailResult } from './types';
 
 const ENTITY_CACHE_VERSION = 1;
@@ -93,9 +93,12 @@ export async function loadArchive(
   options: LoadArchiveOptions = {},
 ): Promise<ArchiveSnapshot> {
   if (!scope.scoped) {
-    return emptySnapshot('unavailable', UNSCOPED_MESSAGE);
+    return emptySnapshot('unavailable', unscopedMessage(scope.reason));
   }
 
+  // The transport is chosen by the caller from the runtime state
+  // (`resolveQdnReadPort`): a published render context without the host bridge
+  // reads over verified same-origin REST instead of failing as unavailable.
   const reader = options.reader ?? bridgeQdnReadPort;
   const cache = options.cache ?? getContentCache();
   const now = options.now ?? Date.now();
@@ -245,7 +248,10 @@ export async function loadEntityDetail(
     return {
       status: 'unavailable',
       entity: null,
-      error: new ContentError({ kind: 'publisher-unscoped', message: UNSCOPED_MESSAGE }),
+      error: new ContentError({
+        kind: 'publisher-unscoped',
+        message: unscopedMessage(scope.reason),
+      }),
     };
   }
   const entityId = resolveEntityReference(kind, reference);

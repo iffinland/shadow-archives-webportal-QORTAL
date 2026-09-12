@@ -92,7 +92,7 @@ interface DetailRecord {
  * only place the full entity resource is downloaded.
  */
 export function useEntityDetail(kind: EntityKind, reference: string): EntityDetailState {
-  const { scope } = useContent();
+  const { scope, reader } = useContent();
   const [nonce, setNonce] = useState(0);
   const requestKey = `${kind}:${reference}:${nonce}`;
 
@@ -112,7 +112,7 @@ export function useEntityDetail(kind: EntityKind, reference: string): EntityDeta
   useEffect(() => {
     const id = loadIdRef.current + 1;
     loadIdRef.current = id;
-    void loadEntityDetail(scope, kind, reference).then((result) => {
+    void loadEntityDetail(scope, kind, reference, { reader }).then((result) => {
       if (id !== loadIdRef.current) return;
       setRecord({
         key: requestKey,
@@ -124,7 +124,7 @@ export function useEntityDetail(kind: EntityKind, reference: string): EntityDeta
     return () => {
       loadIdRef.current += 1;
     };
-  }, [scope, kind, reference, requestKey]);
+  }, [scope, reader, kind, reference, requestKey]);
 
   const reload = useCallback(() => {
     setNonce((value) => value + 1);

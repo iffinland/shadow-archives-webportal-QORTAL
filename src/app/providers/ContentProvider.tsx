@@ -12,10 +12,12 @@ import {
 import {
   loadArchive,
   resolvePublisherScope,
-  UNSCOPED_MESSAGE,
+  resolveQdnReadPort,
+  unscopedMessage,
   type ArchiveSnapshot,
   type LoadArchiveOptions,
   type PublisherScope,
+  type QdnReadPort,
 } from '../../services';
 import { useQortalEnvironment } from './BridgeProvider';
 
@@ -38,13 +40,13 @@ type ArchiveLoader = (
 ) => Promise<ArchiveSnapshot>;
 
 /**
- * Outside a Qortal host no production publisher identity exists, so the initial
- * state is an honest `unavailable` rather than a loading spinner that resolves to
- * the same thing.
+ * When the scope is genuinely unresolved (a plain browser, the dev proxy, or a
+ * frame with no injected name) the initial state is an honest `unavailable`
+ * rather than a loading spinner that resolves to the same thing.
  */
 function snapshotForScope(scope: PublisherScope): ArchiveSnapshot {
   if (scope.scoped) return LOADING_SNAPSHOT;
-  return { ...LOADING_SNAPSHOT, status: 'unavailable', message: UNSCOPED_MESSAGE };
+  return { ...LOADING_SNAPSHOT, status: 'unavailable', message: unscopedMessage(scope.reason) };
 }
 
 function scopeKeyOf(scope: PublisherScope): string {
@@ -54,6 +56,13 @@ function scopeKeyOf(scope: PublisherScope): string {
 interface ContentContextValue {
   readonly snapshot: ArchiveSnapshot;
   readonly scope: PublisherScope;
+  /**
+   * The read transport for this runtime state. A published render context
+   * without the host bridge uses the verified same-origin REST port; a
+   * bridge-capable runtime uses the injected shim. Detail routes reuse it so
+   * every read passes through the same runtime-state decision.
+   */
+  readonly reader: QdnReadPort;
   /** Re-run discovery, bypassing the cache (user-initiated retry). */
   readonly refresh: () => void;
 }
@@ -76,6 +85,7 @@ interface ContentProviderProps {
 export function ContentProvider({ children, loader = loadArchive }: ContentProviderProps) {
   const environment = useQortalEnvironment();
   const scope = useMemo(() => resolvePublisherScope(environment), [environment]);
+  const reader = useMemo(() => resolveQdnReadPort(environment), [environment]);
   const scopeKey = scopeKeyOf(scope);
 
   const [record, setRecord] = useState<{ key: string; snapshot: ArchiveSnapshot }>(() => ({
@@ -99,7 +109,7 @@ export function ContentProvider({ children, loader = loadArchive }: ContentProvi
         next = snapshotForScope(scope);
       } else {
         try {
-          next = await loader(scope, { force });
+          next = await loader(scope, { force, reader });
         } catch {
           // loadArchive normalizes its own errors; this guards an injected loader.
           next = { ...LOADING_SNAPSHOT, status: 'error', message: 'Archive discovery failed.' };
@@ -107,7 +117,7 @@ export function ContentProvider({ children, loader = loadArchive }: ContentProvi
       }
       if (id === loadIdRef.current) setRecord({ key: scopeKey, snapshot: next });
     },
-    [loader, scope, scopeKey],
+    [loader, reader, scope, scopeKey],
   );
 
   useEffect(() => {
@@ -129,8 +139,8 @@ export function ContentProvider({ children, loader = loadArchive }: ContentProvi
   }, [runLoad, scopeKey]);
 
   const value = useMemo<ContentContextValue>(
-    () => ({ snapshot, scope, refresh }),
-    [snapshot, scope, refresh],
+    () => ({ snapshot, scope, reader, refresh }),
+    [snapshot, scope, reader, refresh],
   );
 
   return <ContentContext.Provider value={value}>{children}</ContentContext.Provider>;

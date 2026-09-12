@@ -65,11 +65,21 @@ function describeInjected(value: string | null | undefined): string {
  * and no secret or account data is displayed.
  */
 function HostContextDiagnostics({ environment }: { readonly environment: QdnEnvironment }) {
+  // Core injects `_qdnIdentifier=""` for the default (identifier-less) resource.
+  // Inside a Qortal frame that is a fact about the served resource, not a missing
+  // value, so it is reported as such instead of as "not injected".
+  const identifier = environment.identifier
+    ? environment.identifier
+    : environment.isHosted
+      ? 'default (no identifier injected)'
+      : describeInjected(environment.identifier);
+
   const rows: DetailRow[] = [
     { label: 'Bridge available', value: environment.bridgeAvailable ? 'yes' : 'no' },
+    { label: 'Runtime state', value: environment.runtimeState },
     { label: '_qdnService', value: describeInjected(environment.service) },
     { label: '_qdnName', value: describeInjected(environment.name) },
-    { label: '_qdnIdentifier', value: describeInjected(environment.identifier) },
+    { label: '_qdnIdentifier', value: identifier },
     { label: '_qdnContext', value: describeInjected(environment.context) },
     { label: '_qdnBase', value: describeInjected(environment.base) },
     { label: '_qdnBaseWithPath', value: describeInjected(environment.baseWithPath) },
@@ -109,6 +119,7 @@ export default function StudioPage() {
   const environment = useQortalEnvironment();
   const { capability } = useCapability();
   const { permission, account, ownedNames, authenticate, cancel, reset } = useAuth();
+  const { runtimeState } = environment;
 
   const startOwnerMode = () => {
     void authenticate();
@@ -278,17 +289,48 @@ export default function StudioPage() {
         </p>
       </header>
 
-      {!environment.bridgeAvailable ? (
+      {runtimeState === 'plain-browser' ? (
         <EmptyState
-          title="Not running in a Qortal host"
-          description="This page is open in a plain browser, so there is no Qortal account bridge and no publishing identity to verify. Reader features work normally; open the published app in a Qortal host for owner mode."
+          title="Plain browser — no Qortal context"
+          description="This page is open outside Qortal: no publishing identity was injected and no account bridge is present. Nothing here is a published runtime. Reader features that need published QDN content require the published app; open the published Shadow Archives app inside a Qortal host for owner mode."
         />
-      ) : environment.isProxy ? (
+      ) : runtimeState === 'qortal-dev-proxy' ? (
         <StatusPanel status="Development — identity not authoritative" tone="muted">
           <p className="sa-studio__body">
             This app is being served through the Qortal node development proxy, which does not carry
             the deployed publishing identity. Owner capability cannot be verified here, and this
             build has no development owner bypass.
+          </p>
+        </StatusPanel>
+      ) : runtimeState === 'qortal-render-readonly' ? (
+        <StatusPanel status="Published in a Qortal render context — read-only" tone="muted">
+          <p className="sa-studio__body">
+            This app is running in a real Qortal render context and the injected identity below is
+            the published resource it was served from. Read-only browsing (Home, Blog, Videos,
+            Gallery, taxonomy, search and content detail) works from that identity.
+          </p>
+          <CapabilityDetails
+            rows={[
+              { label: 'Publishing identity', value: publishingName ?? 'not injected' },
+              { label: 'QDN service', value: environment.service ?? 'not injected' },
+              { label: 'Runtime context', value: environment.context ?? 'not injected' },
+              { label: 'Account bridge', value: 'unavailable in this frame' },
+              { label: 'Owner capability', value: 'unavailable — requires the host bridge' },
+            ]}
+          />
+          <p className="sa-studio__body">
+            Owner mode is unavailable here because the Qortal account bridge (
+            <code>qortalRequest</code>) is not reachable in this frame, so no account can be
+            resolved, no permission can be granted and nothing can be published. Owner controls stay
+            hidden and no account request is made.
+          </p>
+        </StatusPanel>
+      ) : runtimeState === 'qortal-bridge-unidentified' ? (
+        <StatusPanel status="Qortal account bridge present — no published identity" tone="muted">
+          <p className="sa-studio__body">
+            A Qortal account bridge is reachable, but this document was not served with an injected
+            publishing identity, so there is no publisher to verify ownership against. Owner
+            capability stays unavailable and no account request is made.
           </p>
         </StatusPanel>
       ) : permission === 'idle' ? (

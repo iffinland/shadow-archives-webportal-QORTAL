@@ -55,6 +55,7 @@ import {
   type GalleryImageProcessingResult,
   type ImageProcessingDeps,
 } from './imageProcessing';
+import { isOwnerCapableRuntime } from '../qortal/capability';
 import { bridgeQdnReadPort, parseJsonPayload, type QdnReadPort } from './qdnReader';
 
 /* -------------------------------------------------------------------------- */
@@ -189,10 +190,13 @@ export interface PublishGalleryImageOptions {
 /* -------------------------------------------------------------------------- */
 
 function authorityCheck(ctx: OwnerWriteContext, publisherName: string): void {
-  if (!ctx.environment.bridgeAvailable || !ctx.environment.isHosted || ctx.environment.isProxy) {
+  // Writes are gated on the fully capable runtime state only (`qortal-host`:
+  // injected identity + reachable bridge, never the dev proxy). The read-only
+  // same-origin fallback is deliberately NOT sufficient for a write.
+  if (!isOwnerCapableRuntime(ctx.environment)) {
     throw new GalleryPublishError(
       'not-hosted',
-      'Gallery publishing requires the app to run inside a real Qortal host.',
+      'Gallery publishing requires the app to run inside a real Qortal host with an account bridge.',
     );
   }
   if (ctx.capability !== 'owner') {

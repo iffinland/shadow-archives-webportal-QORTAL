@@ -1,4 +1,4 @@
-import { hasQortalBridge } from './environment';
+import { resolveQortalRequest } from './bridgeGlobal';
 import type { QortalBridgeErrorKind } from './types';
 
 /** Default timeout for public, non-interactive node reads performed via the bridge. */
@@ -82,7 +82,7 @@ export interface RequestOptions {
 }
 
 /**
- * The only place in the application that may call `window.qortalRequest`.
+ * The only place in the application that may call the injected bridge.
  * Feature code must import this wrapper instead of touching the global.
  */
 export async function request<T>(
@@ -92,16 +92,17 @@ export async function request<T>(
 ): Promise<T> {
   const target = options.target ?? window;
 
-  if (!hasQortalBridge(target)) {
+  // Supports both verified access styles: the bare global binding the injected
+  // `q-apps.js` classic script creates on Core v6.1.9, and a `window.qortalRequest`
+  // property set directly by a host. Never reads the global outside the real
+  // global object, so a synthetic test window cannot leak another test's bridge.
+  const bridgeRequest = resolveQortalRequest(target);
+
+  if (!bridgeRequest) {
     throw new QortalBridgeError('unavailable', 'Qortal bridge is not available', action);
   }
 
   const timeoutMs = options.timeoutMs ?? DEFAULT_REQUEST_TIMEOUT_MS;
-  const bridgeRequest = target.qortalRequest;
-
-  if (typeof bridgeRequest !== 'function') {
-    throw new QortalBridgeError('unavailable', 'Qortal bridge is not available', action);
-  }
 
   let timer: ReturnType<typeof setTimeout> | undefined;
 

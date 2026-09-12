@@ -170,3 +170,73 @@ export function buildQdnResourcePath(ref: QdnResourceRef, filepath?: string): st
   if (path) url += `?filepath=${encodeURIComponent(path)}`;
   return url;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Same-origin REST fallback (read-only)                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `SEARCH_QDN_RESOURCES` as the node's **lowercase** REST query names.
+ *
+ * This mirrors the verified branch of the injected `q-apps.js`
+ * `window.addEventListener("message", ...)` handler for `SEARCH_QDN_RESOURCES`,
+ * which builds `/arbitrary/resources/search?` and concatenates lowercase
+ * parameters (`exactmatchnames`, `minlevel`, `includestatus`,
+ * `includemetadata`, `namefilter`, `followedonly`, `excludeblocked`,
+ * `default`, repeated `name` for `names`).
+ *
+ * The bridge namespace is camelCase and the REST namespace is lowercase; they
+ * are different contracts and must not be unified.
+ *
+ * Values are percent-encoded with `encodeURIComponent`, which yields the same
+ * wire form the browser's URL parser produces for `q-apps.js`'s raw
+ * concatenation (a space becomes `%20`).
+ */
+export function toSameOriginSearchQuery(params: QdnSearchRequest): string {
+  const parts: string[] = [];
+  const add = (key: string, value: string | number | boolean | undefined): void => {
+    if (value === undefined) return;
+    parts.push(`${key}=${encodeURIComponent(String(value))}`);
+  };
+
+  add('service', params.service);
+  add('query', params.query);
+  add('identifier', params.identifier);
+  add('name', params.name);
+  for (const name of params.names ?? []) add('name', name);
+  for (const keyword of params.keywords ?? []) add('keywords', keyword);
+  add('title', params.title);
+  add('description', params.description);
+  add('prefix', params.prefix);
+  add('exactmatchnames', params.exactMatchNames);
+  add('default', params.defaultResource);
+  add('mode', params.mode);
+  add('minlevel', params.minLevel);
+  add('includestatus', params.includeStatus);
+  add('includemetadata', params.includeMetadata);
+  add('namefilter', params.nameListFilter);
+  add('followedonly', params.followedOnly);
+  add('excludeblocked', params.excludeBlocked);
+  add('before', params.before);
+  add('after', params.after);
+  add('limit', params.limit);
+  add('offset', params.offset);
+  add('reverse', params.reverse);
+
+  return parts.join('&');
+}
+
+/** Same-origin search path, exactly as the injected shim requests it. */
+export function buildSameOriginSearchPath(params: QdnSearchRequest): string {
+  return `/arbitrary/resources/search?${toSameOriginSearchQuery(params)}`;
+}
+
+/**
+ * Same-origin status path (`GET_QDN_RESOURCE_STATUS`).
+ * Verified shim route: `/arbitrary/resource/status/{service}/{name}[/{identifier}]`.
+ */
+export function buildSameOriginStatusPath(ref: QdnResourceRef): string {
+  let url = `/arbitrary/resource/status/${encodeURIComponent(ref.service)}/${encodeURIComponent(ref.name)}`;
+  if (ref.identifier) url += `/${encodeURIComponent(ref.identifier)}`;
+  return url;
+}

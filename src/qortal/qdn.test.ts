@@ -2,11 +2,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildQdnResourcePath,
+  buildSameOriginSearchPath,
+  buildSameOriginStatusPath,
   fetchQdnResourceText,
   getQdnResourceStatus,
   getQdnResourceUrl,
   searchQdnResources,
   toBridgeSearchParams,
+  toSameOriginSearchQuery,
 } from './qdn';
 
 function installBridge(impl: (payload: Record<string, unknown>) => unknown) {
@@ -203,5 +206,60 @@ describe('bridge read primitives', () => {
     for (const call of bridge.mock.calls) {
       expect(call[0]).not.toHaveProperty('action', 'GET_USER_ACCOUNT');
     }
+  });
+});
+
+describe('same-origin REST query mapping', () => {
+  it('emits the lowercase REST names, never the camelCase bridge names', () => {
+    const query = toSameOriginSearchQuery({
+      service: 'DOCUMENT',
+      exactMatchNames: true,
+      defaultResource: true,
+      includeStatus: true,
+      includeMetadata: true,
+      nameListFilter: 'DEFAULT',
+      followedOnly: false,
+      excludeBlocked: true,
+      minLevel: 1,
+    });
+    const params = new URLSearchParams(query);
+
+    expect(params.get('exactmatchnames')).toBe('true');
+    expect(params.get('default')).toBe('true');
+    expect(params.get('includestatus')).toBe('true');
+    expect(params.get('includemetadata')).toBe('true');
+    expect(params.get('namefilter')).toBe('DEFAULT');
+    expect(params.get('followedonly')).toBe('false');
+    expect(params.get('excludeblocked')).toBe('true');
+    expect(params.get('minlevel')).toBe('1');
+
+    for (const camel of [
+      'exactMatchNames',
+      'defaultResource',
+      'includeStatus',
+      'includeMetadata',
+      'nameListFilter',
+      'followedOnly',
+      'excludeBlocked',
+      'minLevel',
+    ]) {
+      expect(params.get(camel)).toBeNull();
+    }
+  });
+
+  it('builds the verified shim paths', () => {
+    expect(buildSameOriginSearchPath({ service: 'DOCUMENT' })).toBe(
+      '/arbitrary/resources/search?service=DOCUMENT',
+    );
+    expect(
+      buildSameOriginStatusPath({
+        service: 'DOCUMENT',
+        name: 'Shadow Archives',
+        identifier: 'saw_x',
+      }),
+    ).toBe('/arbitrary/resource/status/DOCUMENT/Shadow%20Archives/saw_x');
+    expect(buildSameOriginStatusPath({ service: 'DOCUMENT', name: 'Shadow Archives' })).toBe(
+      '/arbitrary/resource/status/DOCUMENT/Shadow%20Archives',
+    );
   });
 });

@@ -1,5 +1,11 @@
 export { ContentError, toContentError, type ContentErrorKind } from './errors';
-export { resolvePublisherScope, UNSCOPED_MESSAGE, type PublisherScope } from './publisher';
+export {
+  UNSCOPED_MESSAGES,
+  resolvePublisherScope,
+  unscopedMessage,
+  type PublisherScope,
+  type UnscopedReason,
+} from './publisher';
 export { runBounded, type BoundedResult } from './queue';
 export {
   CACHE_DB_NAME,
@@ -20,6 +26,12 @@ export {
   type QdnReadPort,
   type QdnSearchHit,
 } from './qdnReader';
+export {
+  SAME_ORIGIN_READ_TIMEOUT_MS,
+  getSameOriginResourceStatus,
+  resolveQdnReadPort,
+  sameOriginQdnReadPort,
+} from './readPort';
 export {
   entityIdentifierMatches,
   findExactResource,

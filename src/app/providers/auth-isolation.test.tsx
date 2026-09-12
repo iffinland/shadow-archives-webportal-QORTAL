@@ -43,6 +43,7 @@ beforeEach(() => {
 
 afterEach(() => {
   resetAuthSession();
+  vi.unstubAllGlobals();
   Reflect.deleteProperty(window, 'qortalRequest');
 });
 
@@ -61,6 +62,32 @@ describe('permission-free public browsing', () => {
 
     expect(bridge).not.toHaveBeenCalled();
   }, 60_000);
+
+  it('issues no account request in the published read-only render runtime', async () => {
+    // The observed published runtime: injected identity, no reachable bridge.
+    // Browsing must still work and must never open an account prompt.
+    const bridge = installBridge();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve({ ok: true, status: 200, text: () => Promise.resolve('[]') })),
+    );
+
+    renderApp({
+      route: '/gallery',
+      environment: makeEnvironment({
+        context: 'render',
+        service: 'APP',
+        name: 'Shadow%20Archives',
+        publisherName: 'Shadow Archives',
+        base: '/render/APP/Shadow%20Archives',
+      }),
+    });
+    await screen.findByRole('heading', { level: 1, name: 'Gallery' });
+
+    expect(accountRequests(bridge)).toHaveLength(0);
+    expect(bridge).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
 
   it('never issues GET_USER_ACCOUNT while reading a scoped archive', async () => {
     const bridge = installBridge();

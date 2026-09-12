@@ -24,6 +24,45 @@ describe('deriveCapability', () => {
     expect(deriveCapability(input({ environment: makeEnvironment() }))).toBe('unknown');
   });
 
+  it('is unknown in a published render context without a bridge, even with owner proof', () => {
+    // The published read-only runtime injects a real identity, but no bridge
+    // means no account, no permission and therefore no owner capability.
+    const environment = makeEnvironment({
+      context: 'render',
+      service: 'APP',
+      name: 'Shadow%20Archives',
+      publisherName: 'Shadow Archives',
+    });
+    expect(environment.runtimeState).toBe('qortal-render-readonly');
+    expect(
+      deriveCapability(
+        input({
+          environment,
+          permission: 'granted',
+          account,
+          ownsPublisherName: true,
+          ownsAnyName: true,
+          ownershipResolved: true,
+        }),
+      ),
+    ).toBe('unknown');
+  });
+
+  it('is unknown when a bridge exists with no injected published identity', () => {
+    expect(
+      deriveCapability(
+        input({
+          environment: makeEnvironment({ bridgeAvailable: true }),
+          permission: 'granted',
+          account,
+          ownsPublisherName: true,
+          ownsAnyName: true,
+          ownershipResolved: true,
+        }),
+      ),
+    ).toBe('unknown');
+  });
+
   it('is unknown in the dev proxy even though a bridge exists', () => {
     expect(
       deriveCapability(
