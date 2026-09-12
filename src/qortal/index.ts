@@ -42,6 +42,13 @@ export {
   resolvePublisherOwnership,
   retryAccount,
 } from './auth';
+export {
+  clearOwnerModeMarker,
+  isOwnerModeMarked,
+  markOwnerMode,
+  OWNER_MODE_STORAGE_KEY,
+  OWNER_MODE_STORAGE_VALUE,
+} from './ownerModeSession';
 export { deriveCapability, isOwner, isOwnerCapableRuntime } from './capability';
 export {
   buildQortalAppUrl,

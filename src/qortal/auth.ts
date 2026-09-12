@@ -9,9 +9,12 @@ import type { QortalAccount, QortalNameData, QortalNameSummary } from './types';
  * a rejection cached for the session, no automatic retry after rejection, and
  * no component triggering `GET_USER_ACCOUNT` independently.
  *
- * IMPORTANT: nothing in this module runs at startup. `requestAccount()` is only
- * called from an explicit user action (the Owner/Studio capability flow), so
- * the visitor shell never opens a permission dialog.
+ * IMPORTANT: nothing in this module runs at startup for an ordinary mount.
+ * `requestAccount()` is called from the explicit user action (the Owner/Studio
+ * capability flow) and from the tab-scoped owner-mode restore, which runs only
+ * when this tab previously marked an explicit owner-mode session in
+ * `sessionStorage` (see `ownerModeSession.ts`). The visitor shell therefore
+ * never opens a permission dialog.
  *
  * Verified contracts (2026-09-11, Core `108bf191` v6.1.9, Hub `12a573b`):
  * - `GET_USER_ACCOUNT` is host-mediated and returns `{address, publicKey}`.

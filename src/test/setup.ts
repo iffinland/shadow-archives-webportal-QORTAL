@@ -2,6 +2,8 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
 import { afterEach, beforeEach, vi } from 'vitest';
 
+import { clearOwnerModeMarker } from '../qortal/ownerModeSession';
+
 /*
  * Lazy route chunks import heavier read-only dependencies (for example the
  * DOMPurify-sanitized rich-text renderer on the blog detail route). Under
@@ -75,6 +77,9 @@ beforeEach(() => {
   installMatchMedia();
   installResizeObserver();
   installBlobArrayBuffer();
+  // The owner-mode marker is tab-scoped `sessionStorage` state. jsdom keeps it
+  // for the whole test file, so clear it per test to keep mounts independent.
+  clearOwnerModeMarker();
 });
 
 afterEach(() => {
