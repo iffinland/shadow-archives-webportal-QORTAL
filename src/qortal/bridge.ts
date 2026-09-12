@@ -11,16 +11,25 @@ export const DEFAULT_REQUEST_TIMEOUT_MS = 20_000;
  */
 export const PERMISSION_REQUEST_TIMEOUT_MS = 60 * 60 * 1000;
 
-/** Structured bridge failure. The `kind` is part of the app's error taxonomy. */
+/**
+ * Structured bridge failure. The `kind` is part of the app's error taxonomy.
+ *
+ * `detail` retains the raw rejection value. A grouped write can reject with a
+ * structured partial-failure payload (`unsuccessfulPublishes`), and the write
+ * layer must be able to report exactly which resources failed; collapsing that
+ * into a message string would lose the truthful per-resource result.
+ */
 export class QortalBridgeError extends Error {
   readonly kind: QortalBridgeErrorKind;
   readonly action: string;
+  readonly detail: unknown;
 
-  constructor(kind: QortalBridgeErrorKind, message: string, action: string) {
+  constructor(kind: QortalBridgeErrorKind, message: string, action: string, detail?: unknown) {
     super(message);
     this.name = 'QortalBridgeError';
     this.kind = kind;
     this.action = action;
+    this.detail = detail;
   }
 }
 
@@ -37,11 +46,13 @@ function errorMessage(error: unknown): string {
 function classify(error: unknown, action: string): QortalBridgeError {
   if (error instanceof QortalBridgeError) return error;
 
+  const detail = error;
+
   const message = errorMessage(error);
   const normalized = message.toLowerCase();
 
   if (normalized.includes('timed out') || normalized.includes('timeout')) {
-    return new QortalBridgeError('timeout', message || 'The request timed out', action);
+    return new QortalBridgeError('timeout', message || 'The request timed out', action, detail);
   }
   if (
     normalized.includes('denied') ||
@@ -49,16 +60,16 @@ function classify(error: unknown, action: string): QortalBridgeError {
     normalized.includes('user declined') ||
     normalized.includes('cancel')
   ) {
-    return new QortalBridgeError('rejected', message || 'The request was rejected', action);
+    return new QortalBridgeError('rejected', message || 'The request was rejected', action, detail);
   }
   if (
     normalized.includes('empty response') ||
     normalized.includes('invalid') ||
     normalized.includes('unexpected token')
   ) {
-    return new QortalBridgeError('malformed', message || 'Malformed response', action);
+    return new QortalBridgeError('malformed', message || 'Malformed response', action, detail);
   }
-  return new QortalBridgeError('error', message || 'Bridge request failed', action);
+  return new QortalBridgeError('error', message || 'Bridge request failed', action, detail);
 }
 
 export interface RequestOptions {

@@ -67,3 +67,96 @@ export function isCatalogIdentifier(identifier: unknown): boolean {
 export function discoveryPrefix(kind: EntityKind): string {
   return IDENTIFIER_PREFIX_BY_KIND[kind];
 }
+
+const BASE36_ALPHABET = '0123456789abcdefghijklmnopqrstuvwxyz';
+/**
+ * Largest multiple of 36 that fits in a byte; values at or above it are
+ * rejected so `% 36` stays uniform (modulo bias would shrink the effective
+ * entropy of the stable id).
+ */
+const BASE36_REJECTION_THRESHOLD = 252;
+
+/** Injectable entropy source so the generator stays testable and deterministic in tests. */
+export type RandomBytes = (length: number) => Uint8Array;
+
+function cryptoRandomBytes(length: number): Uint8Array {
+  const bytes = new Uint8Array(length);
+  const source = globalThis.crypto;
+  if (!source || typeof source.getRandomValues !== 'function') {
+    throw new Error('Cryptographically secure randomness is unavailable in this context');
+  }
+  // `getRandomValues` rejects requests above 65536 bytes; the stable id needs 12.
+  source.getRandomValues(bytes);
+  return bytes;
+}
+
+/**
+ * Generate the contract's stable id: exactly 12 lowercase base36 characters
+ * (~62 bits) from cryptographically strong browser randomness.
+ *
+ * `Date.now`, `Math.random` and title slugs are deliberately NOT used: the id is
+ * an identity, not a display value, and collisions are resolved by the caller's
+ * bounded retry rather than by a timestamp.
+ */
+export function generateStableId(random: RandomBytes = cryptoRandomBytes): string {
+  let value = '';
+  while (value.length < 12) {
+    const bytes = random(12);
+    for (const byte of bytes) {
+      if (value.length === 12) break;
+      if (byte >= BASE36_REJECTION_THRESHOLD) continue;
+      value += BASE36_ALPHABET[byte % 36];
+    }
+  }
+  return value;
+}
+
+export interface GenerateUniqueStableIdOptions {
+  /** Bounded retry budget; the contract requires a bounded collision check. */
+  readonly maxAttempts?: number;
+  readonly random?: RandomBytes;
+}
+
+/**
+ * Generate a stable id that is not already taken. `isTaken` is supplied by the
+ * caller (catalog entries and/or an exact resource lookup). Exhausting the
+ * bounded budget throws instead of looping forever.
+ */
+export async function generateUniqueStableId(
+  isTaken: (id: string) => boolean | Promise<boolean>,
+  options: GenerateUniqueStableIdOptions = {},
+): Promise<string> {
+  const maxAttempts = options.maxAttempts ?? 8;
+  const random = options.random ?? cryptoRandomBytes;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const id = generateStableId(random);
+    if (!(await isTaken(id))) return id;
+  }
+  throw new Error('Could not generate a unique gallery id after repeated attempts');
+}
+
+/** Media identifier family for a gallery item id (`saw_img_media_<id12>`). */
+export function buildGalleryMediaIdentifier(id: string): string {
+  return `saw_img_media_${id}`;
+}
+
+/** Thumbnail identifier family for a gallery item id (`saw_img_thumb_<id12>`). */
+export function buildGalleryThumbnailIdentifier(id: string): string {
+  return `saw_img_thumb_${id}`;
+}
+
+/** Recover the item id from a related media/thumbnail identifier, when it matches the shape. */
+export function parseGalleryMediaIdentifier(
+  identifier: unknown,
+): { readonly kind: 'media' | 'thumbnail'; readonly id: string } | null {
+  if (typeof identifier !== 'string') return null;
+  for (const [prefix, kind] of [
+    ['saw_img_media_', 'media'],
+    ['saw_img_thumb_', 'thumbnail'],
+  ] as const) {
+    if (!identifier.startsWith(prefix)) continue;
+    const id = identifier.slice(prefix.length);
+    return isStableId(id) ? { kind, id } : null;
+  }
+  return null;
+}

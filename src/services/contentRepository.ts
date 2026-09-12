@@ -14,6 +14,22 @@ import type { ArchiveDiagnostic, ArchiveSnapshot, EntityDetailResult } from './t
 
 const ENTITY_CACHE_VERSION = 1;
 
+/** Cache key for one entity payload. Exported so the publish path can invalidate it. */
+export function entityCacheKey(publisherName: string, identifier: string): string {
+  return `entity:${publisherName.toLowerCase()}:${identifier}`;
+}
+
+/** Drop cached entity payloads for the given identifiers (used after a publish). */
+export async function invalidateEntityCache(
+  cache: ContentCache,
+  publisherName: string,
+  identifiers: readonly string[],
+): Promise<void> {
+  for (const identifier of identifiers) {
+    await cache.delete(entityCacheKey(publisherName, identifier));
+  }
+}
+
 export function aggregateTaxonomy(listings: readonly CatalogListing[]): {
   categories: TaxonomyReference[];
   tags: TaxonomyReference[];
@@ -244,7 +260,7 @@ export async function loadEntityDetail(
   const reader = options.reader ?? bridgeQdnReadPort;
   const cache = options.cache ?? getContentCache();
   const identifier = buildEntityIdentifier(kind, entityId);
-  const cacheKey = `entity:${scope.name.toLowerCase()}:${identifier}`;
+  const cacheKey = entityCacheKey(scope.name, identifier);
 
   const cached = await cache.get(cacheKey, ENTITY_CACHE_VERSION);
   let payload: unknown;

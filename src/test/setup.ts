@@ -49,9 +49,32 @@ function installResizeObserver() {
   });
 }
 
+/**
+ * jsdom's `Blob` predates `Blob.prototype.arrayBuffer`, which the browser-native
+ * Gallery image pipeline and base64 encoder rely on. Polyfill it with
+ * `FileReader` so the real production code path is exercised under test instead
+ * of being mocked away.
+ */
+function installBlobArrayBuffer() {
+  if (typeof Blob === 'undefined' || typeof Blob.prototype.arrayBuffer === 'function') return;
+  Object.defineProperty(Blob.prototype, 'arrayBuffer', {
+    configurable: true,
+    writable: true,
+    value(this: Blob): Promise<ArrayBuffer> {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as ArrayBuffer);
+        reader.onerror = () => reject(reader.error ?? new Error('Blob read failed'));
+        reader.readAsArrayBuffer(this);
+      });
+    },
+  });
+}
+
 beforeEach(() => {
   installMatchMedia();
   installResizeObserver();
+  installBlobArrayBuffer();
 });
 
 afterEach(() => {

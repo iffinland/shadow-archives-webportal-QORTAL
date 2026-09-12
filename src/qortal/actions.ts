@@ -14,8 +14,9 @@
  * - `PERMISSIONED_ACTIONS` are host-mediated and may open an approval dialog;
  *   they must never be retried automatically or triggered merely to read.
  *
- * Phase 2A is read-only: no write action is implemented, and no write action
- * name is imported by feature code.
+ * Phase 3A adds the Gallery write path. The write actions are declared here and
+ * used only by `qortal/publish.ts`; React components still never call the raw
+ * bridge. The module stays in the startup graph only as constants.
  */
 export const PUBLIC_READ_ACTIONS = {
   GET_NAME_DATA: 'GET_NAME_DATA',
@@ -42,8 +43,16 @@ export const QortalAction = {
 export type QortalActionName = (typeof QortalAction)[keyof typeof QortalAction];
 
 /**
- * Write actions are declared as string literals only, so an accidental use is
- * visible in review. Phase 2A must not call them.
+ * Signed / host-approved write actions.
+ *
+ * `SEND_CHAT_MESSAGE` and the name/transaction actions remain declared as string
+ * literals only so an accidental use stays visible in review; Phase 3A
+ * implements Gallery publishing only.
  */
+export const WRITE_ACTIONS = {
+  PUBLISH_QDN_RESOURCE: 'PUBLISH_QDN_RESOURCE',
+  PUBLISH_MULTIPLE_QDN_RESOURCES: 'PUBLISH_MULTIPLE_QDN_RESOURCES',
+} as const;
+
 export type QortalWriteActionName =
-  'PUBLISH_QDN_RESOURCE' | 'PUBLISH_MULTIPLE_QDN_RESOURCES' | 'SEND_CHAT_MESSAGE';
+  (typeof WRITE_ACTIONS)[keyof typeof WRITE_ACTIONS] | 'SEND_CHAT_MESSAGE';

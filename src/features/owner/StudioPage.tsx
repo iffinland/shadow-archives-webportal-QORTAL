@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 
+import { routes } from '../../app/config/navigation';
 import { useAuth } from '../../app/providers/AuthProvider';
 import { useCapability } from '../../app/providers/CapabilityProvider';
 import { useQortalEnvironment } from '../../app/providers/BridgeProvider';
@@ -226,10 +228,18 @@ export default function StudioPage() {
               ]}
             />
             <p className="sa-studio__body">
-              Publishing, editing and moderation tools arrive in a later phase. This build contains
-              no write actions, so there is nothing to publish yet.
+              Owner mode is active for this session. Gallery publishing is available: the Gallery
+              page now shows owner controls (Add image, Create album) and Studio appears in the main
+              navigation only while this capability is verified.
+            </p>
+            <p className="sa-studio__body">
+              Blog and video publishing, editing, moderation and comments are roadmap items and are
+              not interactive in this build.
             </p>
             <div className="sa-route__actions">
+              <Link className="sa-button sa-button--primary sa-button--md" to={routes.gallery}>
+                Manage Gallery
+              </Link>
               <Button variant="secondary" onClick={retryOwnerMode}>
                 Re-check ownership
               </Button>

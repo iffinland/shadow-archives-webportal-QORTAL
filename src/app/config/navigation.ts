@@ -4,6 +4,9 @@ export type { NavItem };
 
 export const navItems: readonly NavItem[] = siteConfig.navItems;
 
+/** Owner-only navigation items, appended after the public items. */
+export const ownerNavItems: readonly NavItem[] = siteConfig.ownerNavItems;
+
 export const externalAppTargets = siteConfig.externalApps;
 
 /** Route paths referenced by more than one module. */

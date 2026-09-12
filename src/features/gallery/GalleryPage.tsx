@@ -1,8 +1,19 @@
+import { lazy, Suspense } from 'react';
+
+import { useCapability } from '../../app/providers/CapabilityProvider';
 import { IconImage } from '../../components/common';
 import { ListingGrid, useListingState } from '../content';
 
+/**
+ * Owner controls live behind a dynamic import, so the image pipeline, publish
+ * service and modal code are fetched only for a verified owner and never ship in
+ * the visitor startup graph. Non-owners render nothing at all here.
+ */
+const GalleryOwnerPanel = lazy(() => import('./owner/GalleryOwnerPanel'));
+
 /** Albums plus recent items. Listings never download gallery originals. */
 export default function GalleryPage() {
+  const { isOwner } = useCapability();
   const albums = useListingState({ type: 'gallery-album' });
   const items = useListingState({ type: 'gallery-item' }, 12);
 
@@ -15,6 +26,12 @@ export default function GalleryPage() {
           listing.
         </p>
       </header>
+
+      {isOwner ? (
+        <Suspense fallback={null}>
+          <GalleryOwnerPanel />
+        </Suspense>
+      ) : null}
 
       <div className="sa-detail">
         <h2 className="sa-route__title">Albums</h2>

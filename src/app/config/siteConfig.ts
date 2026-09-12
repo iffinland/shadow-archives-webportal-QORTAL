@@ -55,6 +55,16 @@ export const siteConfig = {
     { to: '/contact', label: 'Contact' },
   ] satisfies readonly NavItem[],
 
+  /**
+   * OWNER DECISION (2026-09-12): Studio is appended as the LAST main-navigation
+   * item only while the session holds a positively verified owner capability.
+   * It is absent for visitors, unknown/unauthenticated sessions, accounts with
+   * no registered name, authenticated non-owners and permission failures.
+   * Deciding this must never issue `GET_USER_ACCOUNT`: capability stays `unknown`
+   * until the owner explicitly enters owner mode on `/studio`.
+   */
+  ownerNavItems: [{ to: '/studio', label: 'Studio' }] satisfies readonly NavItem[],
+
   /** Top Posts / Top Videos panel capacity (owner decision: max 10 listed). */
   topList: {
     maxItems: 10,

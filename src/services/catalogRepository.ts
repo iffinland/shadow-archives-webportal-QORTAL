@@ -28,12 +28,30 @@ export type CatalogLoadResult =
   | { readonly kind: 'invalid'; readonly error: ContentError }
   | { readonly kind: 'error'; readonly error: ContentError };
 
-function manifestCacheKey(publisherName: string): string {
+export function manifestCacheKey(publisherName: string): string {
   return `catalog:${publisherName.toLowerCase()}:manifest`;
 }
 
-function partitionCacheKey(publisherName: string, identifier: string): string {
+export function partitionCacheKey(publisherName: string, identifier: string): string {
   return `catalog:${publisherName.toLowerCase()}:partition:${identifier}`;
+}
+
+/**
+ * Drop the cached catalog records affected by a publication.
+ *
+ * The publish path calls this after a successful write so the next read cannot
+ * serve the pre-publication state. Entity resources stay authoritative: a cache
+ * miss merely re-fetches them.
+ */
+export async function invalidateCatalogCache(
+  cache: ContentCache,
+  publisherName: string,
+  options: { readonly manifest?: boolean; readonly partitions?: readonly string[] } = {},
+): Promise<void> {
+  if (options.manifest) await cache.delete(manifestCacheKey(publisherName));
+  for (const identifier of options.partitions ?? []) {
+    await cache.delete(partitionCacheKey(publisherName, identifier));
+  }
 }
 
 function structuralErrorKind(error: ContentError): boolean {
