@@ -1,9 +1,9 @@
 import { useId, useState, type KeyboardEvent } from 'react';
 
-import { IconClose } from '../../../components/common';
-import { LIMITS } from '../../../domain/constants';
-import { dedupeTaxonomy, toTaxonomyReference } from '../../../domain/taxonomy';
-import type { TaxonomyReference } from '../../../domain/types';
+import { IconClose } from '../../components/common';
+import { LIMITS } from '../../domain/constants';
+import { dedupeTaxonomy, toTaxonomyReference } from '../../domain/taxonomy';
+import type { TaxonomyReference } from '../../domain/types';
 
 /**
  * Categories/tags editor.

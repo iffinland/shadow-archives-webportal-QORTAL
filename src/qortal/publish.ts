@@ -36,7 +36,17 @@ export const PUBLISH_MULTIPLE_TIMEOUT_MS_PER_RESOURCE = 30 * 60 * 1000;
 /** Small buffer so the host's own timeout surfaces before ours does. */
 const TIMEOUT_BUFFER_MS = 60 * 1000;
 
-/** One resource to publish, using the exact Hub payload field names. */
+/**
+ * One resource to publish, using the exact Hub payload field names.
+ *
+ * Exactly one of `data64` / `file` must be supplied. `file` passes raw bytes to
+ * the host, which base64-encodes them itself (verified: Hub `12a573b2`
+ * `src/qortal/get.ts` reads `data.file || data.blob`, then
+ * `publishData({ data: data64 ? data64 : file })`). Large media MUST use `file`
+ * so the app never materialises a second base64 copy of the bytes in its own
+ * heap. `q-apps.js` forwards the request object to the host by structured clone
+ * (`parent.postMessage(event.data, …)`), so a `File`/`Blob` survives the hop.
+ */
 export interface PublishResourceInput {
   readonly service: string;
   /** `null`/omitted publishes the default (identifier-less) resource. */
@@ -46,8 +56,10 @@ export interface PublishResourceInput {
    * from `_qdnName` so a write can never silently target another owned name.
    */
   readonly name: string;
-  /** Base64-encoded resource bytes. */
-  readonly data64: string;
+  /** Base64-encoded resource bytes (small payloads). */
+  readonly data64?: string;
+  /** Raw bytes; the host base64-encodes them. Mutually exclusive with `data64`. */
+  readonly file?: Blob;
   readonly filename?: string;
   readonly title?: string;
   readonly description?: string;
@@ -109,11 +121,17 @@ export interface PublishPort {
 }
 
 function toBridgePayload(resource: PublishResourceInput): Record<string, unknown> {
+  const hasData = typeof resource.data64 === 'string' && resource.data64.length > 0;
+  const hasFile = resource.file !== undefined && resource.file !== null;
+  if (hasData === hasFile) {
+    throw new Error('A publish resource needs exactly one of data64 or file');
+  }
   const payload: Record<string, unknown> = {
     service: resource.service,
     name: resource.name,
-    data64: resource.data64,
   };
+  if (hasFile) payload.file = resource.file;
+  else payload.data64 = resource.data64;
   if (resource.identifier) payload.identifier = resource.identifier;
   if (resource.filename) payload.filename = resource.filename;
   if (resource.title) payload.title = resource.title;
@@ -177,11 +195,14 @@ function failureFor(resource: PublishResourceInput, error: QortalBridgeError): P
 
 async function publishCall(
   action: QortalWriteActionName,
-  params: Record<string, unknown>,
+  buildParams: (payloads: readonly Record<string, unknown>[]) => Record<string, unknown>,
   resources: readonly PublishResourceInput[],
   timeoutMs: number,
 ): Promise<PublishAttempt> {
   try {
+    // Built inside the async body so a malformed input rejects the promise
+    // instead of throwing synchronously out of the port.
+    const params = buildParams(resources.map(toBridgePayload));
     const raw = await request<unknown>(action, params, { timeoutMs });
     const list = Array.isArray(raw) ? raw : [raw];
     const submissions = list.map((entry, index) => {
@@ -233,7 +254,7 @@ export const bridgePublishPort: PublishPort = {
   publishResource(resource, options) {
     return publishCall(
       'PUBLISH_QDN_RESOURCE',
-      toBridgePayload(resource),
+      (payloads) => ({ ...payloads[0] }),
       [resource],
       options?.timeoutMs ?? PUBLISH_REQUEST_TIMEOUT_MS,
     );
@@ -245,7 +266,7 @@ export const bridgePublishPort: PublishPort = {
     }
     return publishCall(
       'PUBLISH_MULTIPLE_QDN_RESOURCES',
-      { resources: resources.map(toBridgePayload) },
+      (payloads) => ({ resources: [...payloads] }),
       resources,
       options?.timeoutMs ??
         resources.length * PUBLISH_MULTIPLE_TIMEOUT_MS_PER_RESOURCE + TIMEOUT_BUFFER_MS,

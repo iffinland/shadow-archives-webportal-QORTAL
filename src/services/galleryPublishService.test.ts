@@ -311,6 +311,18 @@ function installNameBridge(owner: () => string = () => OWNER): { readonly calls:
   return { calls };
 }
 
+/**
+ * Narrow a recorded publish payload's base64 body. The write port also accepts
+ * raw `file` bytes (used by the video flow for large media), so the field is
+ * optional at the type level; a Gallery publication always uses `data64`.
+ */
+function data64Of(resource: PublishResourceInput): string {
+  if (typeof resource.data64 !== 'string') {
+    throw new Error('expected a base64 publish payload');
+  }
+  return resource.data64;
+}
+
 function decodePayload(data64: string): unknown {
   return JSON.parse(atob(data64)) as unknown;
 }
@@ -532,7 +544,7 @@ describe('publishGalleryImage — contracts', () => {
     );
 
     const documentCall = writer.calls.find((call) => call.kind === 'single');
-    const payload = decodePayload(documentCall!.resources[0].data64);
+    const payload = decodePayload(data64Of(documentCall!.resources[0]));
     const validated = validateEntityPayload(payload, { expectedKind: 'gallery-item' });
     expect(validated.ok).toBe(true);
 
@@ -649,7 +661,7 @@ describe('publishGalleryAlbum — contracts', () => {
     );
 
     expect(result.entityIdentifier).toBe(`saw_album_${FIXED_ID}`);
-    const payload = decodePayload(writer.calls[0].resources[0].data64);
+    const payload = decodePayload(data64Of(writer.calls[0].resources[0]));
     const validated = validateEntityPayload(payload, { expectedKind: 'gallery-album' });
     expect(validated.ok).toBe(true);
     expect((validated.ok ? validated.value : null)?.data).toMatchObject({
@@ -685,7 +697,7 @@ describe('publishGalleryImage — catalog', () => {
       'saw_cat_manifest',
     ]);
 
-    const manifest = decodePayload(catalogCall.resources[1].data64);
+    const manifest = decodePayload(data64Of(catalogCall.resources[1]));
     const manifestValidation = validateCatalogManifest(manifest);
     expect(manifestValidation.ok).toBe(true);
     expect(manifestValidation.ok ? manifestValidation.value.catalogVersion : null).toBe(1);
@@ -699,7 +711,7 @@ describe('publishGalleryImage — catalog', () => {
       },
     ]);
 
-    const partition = decodePayload(catalogCall.resources[0].data64);
+    const partition = decodePayload(data64Of(catalogCall.resources[0]));
     const partitionValidation = validateCatalogPartition(
       partition,
       'gallery-item',
@@ -738,11 +750,11 @@ describe('publishGalleryImage — catalog', () => {
 
     expect(result.indexUpdated).toBe(true);
     const catalogCall = writer.calls[2];
-    const manifest = decodePayload(catalogCall.resources[1].data64);
+    const manifest = decodePayload(data64Of(catalogCall.resources[1]));
     const manifestValidation = validateCatalogManifest(manifest);
     expect(manifestValidation.ok ? manifestValidation.value.catalogVersion : null).toBe(4);
 
-    const partition = decodePayload(catalogCall.resources[0].data64);
+    const partition = decodePayload(data64Of(catalogCall.resources[0]));
     const partitionValidation = validateCatalogPartition(partition);
     const ids = partitionValidation.ok
       ? partitionValidation.value.listings.map((listing) => listing.id)
@@ -774,7 +786,7 @@ describe('publishGalleryImage — catalog', () => {
 
     await publishGalleryImage(ownerContext(), imageDraft({ id: FIXED_ID }), {}, deps);
 
-    const partition = decodePayload(writer.calls[2].resources[0].data64);
+    const partition = decodePayload(data64Of(writer.calls[2].resources[0]));
     const partitionValidation = validateCatalogPartition(partition);
     expect(partitionValidation.ok ? partitionValidation.value.listings : []).toHaveLength(1);
   });
@@ -956,7 +968,7 @@ describe('publishGalleryImage — catalog', () => {
     );
 
     expect(result.status).toBe('published');
-    const partition = decodePayload(writer.calls[2].resources[0].data64);
+    const partition = decodePayload(data64Of(writer.calls[2].resources[0]));
     const validated = validateCatalogPartition(partition, 'gallery-item', 'saw_cat_img_p000');
     const ids = validated.ok ? validated.value.listings.map((listing) => listing.id) : [];
     expect(ids).toContain('existing0001');
@@ -983,9 +995,9 @@ describe('published Gallery content is consumable by the existing read pipeline'
     );
     expect(result.status).toBe('published');
 
-    const entityText = atob(writer.calls[1].resources[0].data64);
-    const partitionText = atob(writer.calls[2].resources[0].data64);
-    const manifestText = atob(writer.calls[2].resources[1].data64);
+    const entityText = atob(data64Of(writer.calls[1].resources[0]));
+    const partitionText = atob(data64Of(writer.calls[2].resources[0]));
+    const manifestText = atob(data64Of(writer.calls[2].resources[1]));
 
     // Serve back exactly what was published, with no test-only shape.
     const reader = readerWithResources([
@@ -1040,7 +1052,7 @@ describe('published Gallery content is consumable by the existing read pipeline'
     expect(result.status).toBe('index-incomplete');
     expect(result.entityIdentifier).toBe(`saw_img_${FIXED_ID}`);
 
-    const entityText = atob(writer.calls[1].resources[0].data64);
+    const entityText = atob(data64Of(writer.calls[1].resources[0]));
     const reader = createRecordingReader(
       (request) => {
         if (request.prefix && request.identifier === 'saw_img_') {

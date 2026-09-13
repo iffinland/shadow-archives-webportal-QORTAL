@@ -13,16 +13,24 @@ export {
 } from './constants';
 export {
   buildEntityIdentifier,
+  buildBlogThumbnailIdentifier,
+  buildGalleryMediaIdentifier,
+  buildGalleryThumbnailIdentifier,
+  buildVideoThumbnailIdentifier,
   discoveryPrefix,
   resolveEntityReference,
   isCatalogIdentifier,
   isStableId,
   parseEntityIdentifier,
+  parseBlogThumbnailIdentifier,
+  parseGalleryMediaIdentifier,
+  parseVideoThumbnailIdentifier,
 } from './identifiers';
 export { validateCatalogEntry, validateCatalogManifest, validateCatalogPartition } from './catalog';
 export type { ValidatedCatalogPartition } from './catalog';
 export { validateEntityPayload, validateMediaReference, readTaxonomyLabels } from './entities';
 export { validateRichTextDocument } from './richText';
+export { richTextToMarkdown, richTextToPlainText } from './richTextMarkdown';
 export {
   dedupeTaxonomy,
   normalizeTaxonomySlug,

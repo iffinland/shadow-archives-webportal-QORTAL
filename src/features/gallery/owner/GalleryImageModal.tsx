@@ -25,7 +25,7 @@ import {
 } from '../../../services/galleryPublishService';
 import { useArchive, useArchiveRefresh } from '../../content';
 import { PublicationOutcome, PublishProgressList } from './publishFeedback';
-import { TaxonomyInput } from './TaxonomyInput';
+import { TaxonomyInput } from '../../owner/TaxonomyInput';
 
 const DEFAULT_LANGUAGE = 'en';
 

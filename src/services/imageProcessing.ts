@@ -10,6 +10,7 @@
  * it is part of the visitor startup graph.
  */
 
+import { blobToBase64 } from './base64';
 import {
   GALLERY_MEDIA_POLICY,
   formatByteSize,
@@ -353,6 +354,122 @@ export async function processGalleryImage(
         mimeType: thumbEncode.blob.type || GALLERY_MEDIA_POLICY.thumbnail.format,
         preservedOriginal: false,
       },
+      source: {
+        bytes: file.size,
+        width: bitmap.width,
+        height: bitmap.height,
+        mimeType: detectedType,
+      },
+      notices,
+      warnings,
+    };
+  } finally {
+    bitmap.close?.();
+  }
+}
+
+/* -------------------------------------------------------------------------- */
+/* Poster (single bounded image)                                              */
+/* -------------------------------------------------------------------------- */
+
+/** One bounded image encode policy, supplied by the calling feature. */
+export interface PosterImagePolicy {
+  readonly maxEdge: number;
+  readonly quality: number;
+  readonly format: string;
+  /** Hard byte cap for the target service (fail closed above it). */
+  readonly maxBytes: number;
+}
+
+export interface PosterImageResult {
+  readonly blob: Blob;
+  readonly bytes: number;
+  readonly width: number;
+  readonly height: number;
+  readonly mimeType: string;
+  /** `data:<mime>;base64,<bytes>` — reused for cross-app metadata that embeds it. */
+  readonly dataUrl: string;
+  readonly source: {
+    readonly bytes: number;
+    readonly width: number;
+    readonly height: number;
+    readonly mimeType: GalleryImageSourceMime;
+  };
+  readonly notices: readonly string[];
+  readonly warnings: readonly string[];
+}
+
+/**
+ * Bounded fallback ladder when the first encode misses the service byte cap.
+ * Still bounded (three attempts) and still fail-closed: if nothing fits, the
+ * publication is refused with a truthful message instead of publishing an
+ * over-limit poster.
+ */
+const POSTER_FALLBACK_STEPS = [
+  { edgeScale: 1, qualityScale: 1 },
+  { edgeScale: 0.75, qualityScale: 0.85 },
+  { edgeScale: 0.6, qualityScale: 0.7 },
+] as const;
+
+/**
+ * Encode one poster/thumbnail image: a single bounded web image, plus a data URL
+ * for cross-app metadata that embeds the poster inline (Q-Tube's `videoImage`).
+ *
+ * The source is validated with the same checks the Gallery pipeline uses
+ * (magic-byte sniffing, size and decoded-pixel bounds), so an unsupported or
+ * oversized file is refused before any encode.
+ */
+export async function processPosterImage(
+  file: File,
+  policy: PosterImagePolicy,
+  deps: ImageProcessingDeps = browserImageProcessingDeps,
+): Promise<PosterImageResult> {
+  const detectedType = await assertUsableImageSource(file);
+  const bitmap = await deps.decode(file);
+  try {
+    assertDecodedDimensions(bitmap.width, bitmap.height);
+    const notices: string[] = [];
+    const warnings: string[] = [];
+
+    let result: { blob: Blob; width: number; height: number; scaled: boolean } | null = null;
+    for (const step of POSTER_FALLBACK_STEPS) {
+      const candidate = await encode(
+        deps,
+        bitmap,
+        Math.max(1, Math.round(policy.maxEdge * step.edgeScale)),
+        Math.min(1, policy.quality * step.qualityScale),
+        policy.format,
+      );
+      result = candidate;
+      if (candidate.blob.size <= policy.maxBytes) break;
+    }
+    if (!result) {
+      throw new ImageProcessingError('encode-failed', 'The poster image could not be encoded.');
+    }
+    if (result.blob.size > policy.maxBytes) {
+      throw new ImageProcessingError(
+        'service-limit',
+        `The poster is ${formatByteSize(result.blob.size)}; the thumbnail limit is ${formatByteSize(policy.maxBytes)}. Choose a smaller or simpler image.`,
+      );
+    }
+    if (result.scaled) {
+      notices.push(`Poster scaled to ${result.width}×${result.height} px.`);
+    }
+    if (result.blob.type !== policy.format) {
+      warnings.push(
+        `The browser encoded the poster as ${result.blob.type || 'an unknown type'} instead of ${policy.format}.`,
+      );
+    }
+
+    const mimeType = result.blob.type || policy.format;
+    const dataUrl = `data:${mimeType};base64,${await blobToBase64(result.blob)}`;
+    return {
+      blob: result.blob,
+      bytes: result.blob.size,
+      width: result.width,
+      height: result.height,
+      mimeType,
+      dataUrl,
       source: {
         bytes: file.size,
         width: bitmap.width,

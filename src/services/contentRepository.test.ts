@@ -22,6 +22,7 @@ import {
   TEST_MANIFEST_FIXTURE,
   TEST_PARTITION_FIXTURE,
   TEST_PUBLISHER,
+  TEST_VIDEO_FIXTURE,
   TEST_VIDEO_ID,
 } from '../test/fixtures/content';
 
@@ -449,6 +450,57 @@ describe('loadArchive gallery listing hydration', () => {
     expect(snapshot.diagnostics.some((entry) => entry.code === 'listings-hydration-failed')).toBe(
       true,
     );
+  });
+});
+
+/**
+ * A video the derived index does not carry must still render as a card: the
+ * entity is authoritative and tiny, so bounded hydration resolves the poster
+ * and duration without ever requesting video bytes.
+ */
+describe('loadArchive video listing hydration', () => {
+  function videoReader() {
+    const resources: Record<string, unknown> = {
+      [`saw_vid_${TEST_VIDEO_ID}`]: clone(TEST_VIDEO_FIXTURE),
+    };
+    const fetched: string[] = [];
+    const reader = createRecordingReader(
+      (request) => {
+        if (request.prefix && request.identifier === 'saw_vid_') {
+          return [makeSearchHit('DOCUMENT', TEST_PUBLISHER, `saw_vid_${TEST_VIDEO_ID}`)];
+        }
+        if (typeof request.identifier === 'string' && request.identifier in resources) {
+          return [makeSearchHit('DOCUMENT', TEST_PUBLISHER, request.identifier)];
+        }
+        return [];
+      },
+      (ref) => {
+        fetched.push(`${ref.service}/${ref.identifier ?? ''}`);
+        const value = resources[ref.identifier ?? ''];
+        if (value === undefined) throw new Error('not found');
+        return JSON.stringify(value);
+      },
+    );
+    return { reader, fetched };
+  }
+
+  it('resolves poster and duration from the authoritative entity in the fallback path', async () => {
+    const { reader, fetched } = videoReader();
+
+    const snapshot = await loadArchive(SCOPED, {
+      reader,
+      cache: createContentCache(),
+      now: NOW,
+    });
+
+    expect(snapshot.source).toBe('fallback');
+    const video = snapshot.listings.find((listing) => listing.id === TEST_VIDEO_ID);
+    expect(video?.type).toBe('video');
+    expect(video?.title).toBe('Field footage');
+    expect(video?.durationSeconds).toBe(93.5);
+    expect(video?.thumbnail?.identifier).toBe('saw_thumb_vid000000001');
+    // Hydration reads the DOCUMENT entity only — never the VIDEO bytes.
+    expect(fetched.every((ref) => ref.startsWith('DOCUMENT/'))).toBe(true);
   });
 });
 

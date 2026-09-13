@@ -10,11 +10,13 @@ import { buildEntityIdentifier, isStableId } from './identifiers';
 import { normalizeTaxonomySlug } from './taxonomy';
 import { validateMediaReference } from './entities';
 import type {
+  BlogPost,
   CatalogEntry,
   CatalogListing,
   CatalogManifest,
   CatalogPartitionDescriptor,
   GalleryItem,
+  VideoEntry,
 } from './types';
 import {
   boundedArray,
@@ -186,6 +188,43 @@ export function listingFromGalleryItem(
   };
 }
 
+/**
+ * Catalog listing built directly from an authoritative video entity.
+ *
+ * Video listings carry the duration badge and the poster reference. They
+ * deliberately carry no width/height: a Shadow Archives video entity stores the
+ * media coordinate, not poster pixels, so cards use the 16:9 default.
+ */
+export function listingFromVideoEntry(
+  video: VideoEntry,
+  partitionIdentifier = 'entity',
+): CatalogListing {
+  return {
+    id: video.id,
+    type: 'video',
+    service: 'DOCUMENT',
+    identifier: buildEntityIdentifier('video', video.id),
+    title: video.data.title,
+    slug: video.data.slug,
+    excerpt: video.data.description.slice(0, LIMITS.excerpt),
+    createdAt: video.createdAt,
+    updatedAt: video.updatedAt,
+    categories: video.data.categories.slice(0, LIMITS.taxonomyArray),
+    tags: video.data.tags.slice(0, LIMITS.taxonomyArray),
+    thumbnail: video.data.thumbnail,
+    state: video.state,
+    contentHash: null,
+    likeCount: null,
+    commentCount: null,
+    countsCompiledAt: null,
+    durationSeconds: video.data.durationSeconds,
+    width: null,
+    height: null,
+    albumId: null,
+    partitionIdentifier,
+  };
+}
+
 export function validateCatalogEntry(
   raw: unknown,
   type: EntityKind,
@@ -339,4 +378,40 @@ export function validateCatalogPartition(
     listings,
     rejectedEntries,
   });
+}
+
+/**
+ * Catalog listing built directly from an authoritative blog post entity.
+ *
+ * Blog listings carry the excerpt but no type-specific badge; the cover comes
+ * from the entity's thumbnail reference.
+ */
+export function listingFromBlogPost(
+  post: BlogPost,
+  partitionIdentifier = 'entity',
+): CatalogListing {
+  return {
+    id: post.id,
+    type: 'blog-post',
+    service: 'DOCUMENT',
+    identifier: buildEntityIdentifier('blog-post', post.id),
+    title: post.data.title,
+    slug: post.data.slug,
+    excerpt: post.data.excerpt.slice(0, LIMITS.excerpt),
+    createdAt: post.createdAt,
+    updatedAt: post.updatedAt,
+    categories: post.data.categories.slice(0, LIMITS.taxonomyArray),
+    tags: post.data.tags.slice(0, LIMITS.taxonomyArray),
+    thumbnail: post.data.thumbnail,
+    state: post.state,
+    contentHash: null,
+    likeCount: null,
+    commentCount: null,
+    countsCompiledAt: null,
+    durationSeconds: null,
+    width: null,
+    height: null,
+    albumId: null,
+    partitionIdentifier,
+  };
 }

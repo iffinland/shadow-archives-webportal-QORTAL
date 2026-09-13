@@ -192,6 +192,14 @@
   background: var(--sa-color-surface-sunken);
 }
 
+.sa-preview__video {
+  width: 100%;
+  max-height: 360px;
+  border: 1px solid var(--sa-color-border-strong);
+  border-radius: var(--sa-radius-sm);
+  background: var(--sa-color-surface-sunken);
+}
+
 /* ------------------------------------------------------------- taxonomy ---- */
 
 .sa-taxonomy-edit {

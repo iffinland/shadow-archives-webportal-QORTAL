@@ -17,6 +17,9 @@
     "package:app": "node scripts/package-app.mjs"
   },
   "dependencies": {
+    "@tiptap/pm": "^3.31.3",
+    "@tiptap/react": "^3.31.3",
+    "@tiptap/starter-kit": "^3.31.3",
     "dompurify": "^3.4.15",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
