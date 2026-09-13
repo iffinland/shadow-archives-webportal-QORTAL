@@ -73,6 +73,13 @@ export const LIMITS = {
   searchMaxPages: 20,
   partitionConcurrency: 3,
   entityConcurrency: 4,
+  /**
+   * Upper bound on gallery listings resolved from their authoritative entity in
+   * one archive load. Only listings the derived index does not carry are
+   * hydrated, each fetch is bounded by `entityBytes`, and the full-size media is
+   * never downloaded.
+   */
+  listingHydrationMax: 24,
 } as const;
 
 /** Freshness window for cached catalog/entity reads (success TTL only). */

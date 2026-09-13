@@ -6,14 +6,18 @@ import {
   loadArchive,
   loadEntityDetail,
   paginate,
+  withDerivedAlbumCovers,
 } from './contentRepository';
 import { createContentCache } from './cache';
 import type { CatalogListing } from '../domain';
 import type { PublisherScope } from './publisher';
 import { createRecordingReader, makeSearchHit } from '../test/fixtures/qdn';
 import {
+  TEST_ALBUM_FIXTURE,
+  TEST_ALBUM_ID,
   TEST_BLOG_FIXTURE,
   TEST_BLOG_ID,
+  TEST_ITEM_FIXTURE,
   TEST_ITEM_ID,
   TEST_MANIFEST_FIXTURE,
   TEST_PARTITION_FIXTURE,
@@ -337,6 +341,174 @@ describe('loadArchive', () => {
     });
     expect(snapshot.status).toBe('partial');
     expect(snapshot.message).toMatch(/not proof that the archive is empty/i);
+  });
+});
+
+/**
+ * Gallery-item listings the derived index does not carry must still render:
+ * the entity resource is authoritative and tiny, so a bounded hydration pass
+ * resolves the thumbnail, album membership and canonical title for cards.
+ */
+describe('loadArchive gallery listing hydration', () => {
+  function galleryReader(options: { readonly failEntity?: boolean } = {}) {
+    const resources: Record<string, unknown> = catalogResources();
+    resources[`saw_img_${TEST_ITEM_ID}`] = clone(TEST_ITEM_FIXTURE);
+    resources[`saw_album_${TEST_ALBUM_ID}`] = clone(TEST_ALBUM_FIXTURE);
+    const reader = createRecordingReader(
+      (request) => {
+        if (request.prefix && request.identifier === 'saw_img_') {
+          return [makeSearchHit('DOCUMENT', TEST_PUBLISHER, `saw_img_${TEST_ITEM_ID}`)];
+        }
+        if (request.prefix && request.identifier === 'saw_album_') {
+          return [makeSearchHit('DOCUMENT', TEST_PUBLISHER, `saw_album_${TEST_ALBUM_ID}`)];
+        }
+        if (typeof request.identifier === 'string' && request.identifier in resources) {
+          return [makeSearchHit('DOCUMENT', TEST_PUBLISHER, request.identifier)];
+        }
+        return [];
+      },
+      (ref) => {
+        if (options.failEntity && ref.identifier?.startsWith('saw_img_')) {
+          throw new Error('Data unavailable. Please try again later.');
+        }
+        const value = resources[ref.identifier ?? ''];
+        if (value === undefined) throw new Error('not found');
+        return JSON.stringify(value);
+      },
+    );
+    return reader;
+  }
+
+  it('resolves an item the index does not carry from its authoritative entity', async () => {
+    const snapshot = await loadArchive(SCOPED, {
+      reader: galleryReader(),
+      cache: createContentCache(),
+      now: NOW,
+    });
+
+    const item = snapshot.listings.find((listing) => listing.id === TEST_ITEM_ID);
+    expect(item).toBeDefined();
+    // The card can now render media, and the album page can resolve membership.
+    expect(item?.thumbnail).toEqual({
+      service: 'THUMBNAIL',
+      name: TEST_PUBLISHER,
+      identifier: 'saw_thumb_item00000001',
+    });
+    expect(item?.albumId).toBe(TEST_ALBUM_ID);
+    expect(item?.title).toBe('Plate 01');
+    expect(item?.width).toBe(1200);
+    expect(snapshot.diagnostics.some((entry) => entry.code === 'listings-hydrated')).toBe(true);
+  });
+
+  it('hydrates gallery items in the bounded-discovery recovery path too', async () => {
+    // No manifest at all: every listing comes from bounded discovery, and the
+    // card still resolves media from the authoritative entity.
+    const resources: Record<string, unknown> = {
+      [`saw_img_${TEST_ITEM_ID}`]: clone(TEST_ITEM_FIXTURE),
+    };
+    const reader = createRecordingReader(
+      (request) => {
+        if (request.prefix && request.identifier === 'saw_img_') {
+          return [makeSearchHit('DOCUMENT', TEST_PUBLISHER, `saw_img_${TEST_ITEM_ID}`)];
+        }
+        if (typeof request.identifier === 'string' && request.identifier in resources) {
+          return [makeSearchHit('DOCUMENT', TEST_PUBLISHER, request.identifier)];
+        }
+        return [];
+      },
+      (ref) => {
+        const value = resources[ref.identifier ?? ''];
+        if (value === undefined) throw new Error('not found');
+        return JSON.stringify(value);
+      },
+    );
+
+    const snapshot = await loadArchive(SCOPED, {
+      reader,
+      cache: createContentCache(),
+      now: NOW,
+    });
+
+    expect(snapshot.source).toBe('fallback');
+    const item = snapshot.listings.find((listing) => listing.id === TEST_ITEM_ID);
+    expect(item?.thumbnail?.identifier).toBe('saw_thumb_item00000001');
+    expect(item?.albumId).toBe(TEST_ALBUM_ID);
+  });
+
+  it('keeps the discovery listing and reports a warning when its entity cannot be read', async () => {
+    const snapshot = await loadArchive(SCOPED, {
+      reader: galleryReader({ failEntity: true }),
+      cache: createContentCache(),
+      now: NOW,
+    });
+
+    const item = snapshot.listings.find((listing) => listing.id === TEST_ITEM_ID);
+    expect(item).toBeDefined();
+    expect(item?.thumbnail).toBeNull();
+    expect(snapshot.listings.length).toBeGreaterThan(0);
+    expect(snapshot.diagnostics.some((entry) => entry.code === 'listings-hydration-failed')).toBe(
+      true,
+    );
+  });
+});
+
+describe('withDerivedAlbumCovers', () => {
+  it('gives a coverless album the newest member item thumbnail, without inventing title data', () => {
+    const album = makeListing({
+      id: TEST_ALBUM_ID,
+      type: 'gallery-album',
+      identifier: `saw_album_${TEST_ALBUM_ID}`,
+      title: 'Field plates',
+      thumbnail: null,
+      albumId: null,
+      partitionIdentifier: 'fallback',
+    });
+    const older = makeListing({
+      id: TEST_ITEM_ID,
+      type: 'gallery-item',
+      identifier: `saw_img_${TEST_ITEM_ID}`,
+      updatedAt: 10,
+      albumId: TEST_ALBUM_ID,
+      thumbnail: { service: 'THUMBNAIL', name: TEST_PUBLISHER, identifier: 'thumb-older' },
+    });
+    const newer = makeListing({
+      id: 'item00000002',
+      type: 'gallery-item',
+      identifier: 'saw_img_item00000002',
+      updatedAt: 20,
+      albumId: TEST_ALBUM_ID,
+      thumbnail: { service: 'THUMBNAIL', name: TEST_PUBLISHER, identifier: 'thumb-newer' },
+    });
+
+    const result = withDerivedAlbumCovers([album, older, newer]);
+    const covered = result.find((listing) => listing.id === TEST_ALBUM_ID);
+    expect(covered?.thumbnail).toEqual({
+      service: 'THUMBNAIL',
+      name: TEST_PUBLISHER,
+      identifier: 'thumb-newer',
+    });
+    expect(result.find((listing) => listing.id === TEST_ITEM_ID)?.thumbnail).toEqual(
+      older.thumbnail,
+    );
+  });
+
+  it('never overwrites an album cover that already exists', () => {
+    const cover = { service: 'THUMBNAIL', name: TEST_PUBLISHER, identifier: 'own-cover' };
+    const album = makeListing({
+      id: TEST_ALBUM_ID,
+      type: 'gallery-album',
+      identifier: `saw_album_${TEST_ALBUM_ID}`,
+      thumbnail: cover,
+    });
+    const item = makeListing({
+      id: TEST_ITEM_ID,
+      type: 'gallery-item',
+      identifier: `saw_img_${TEST_ITEM_ID}`,
+      updatedAt: 99,
+      albumId: TEST_ALBUM_ID,
+      thumbnail: { service: 'THUMBNAIL', name: TEST_PUBLISHER, identifier: 'newer' },
+    });
+    expect(withDerivedAlbumCovers([album, item])[0]?.thumbnail).toEqual(cover);
   });
 });
 

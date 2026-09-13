@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadCatalog } from './catalogRepository';
+import { bridgeQdnReadPort } from './qdnReader';
 import { createContentCache } from './cache';
 import { createRecordingReader, makeSearchHit } from '../test/fixtures/qdn';
 import {
@@ -68,6 +69,10 @@ function standardResources(): Record<string, unknown> {
 }
 
 const NOW = 1_700_001_000_000;
+
+afterEach(() => {
+  Reflect.deleteProperty(window, 'qortalRequest');
+});
 
 describe('loadCatalog', () => {
   it('loads a manifest, fetches each declared partition and returns validated listings', async () => {
@@ -197,6 +202,43 @@ describe('loadCatalog', () => {
     expect(second.kind).toBe('loaded');
     expect(offline.searches).toHaveLength(0);
     expect(offline.fetches).toHaveLength(0);
+  });
+
+  it('reads the index through the injected bridge, whose JSON bodies arrive parsed', async () => {
+    // VERIFIED live contract (2026-09-13, Core 108bf191): the injected
+    // `q-apps.js` `handleResponse()` JSON-parses a JSON body and posts the
+    // **parsed value** back as the qortalRequest result. The owner-mode index
+    // read in `galleryPublishService` uses exactly this port, so this is the
+    // regression guard for "the Gallery index could not be read".
+    const resources = standardResources();
+    const parsedBridge = vi.fn(async (request: Record<string, unknown>) => {
+      const action = request.action;
+      const identifier = request.identifier;
+      if (action === 'SEARCH_QDN_RESOURCES') {
+        return typeof identifier === 'string' && identifier in resources
+          ? [makeSearchHit('DOCUMENT', TEST_PUBLISHER, identifier)]
+          : [];
+      }
+      if (action === 'FETCH_QDN_RESOURCE') {
+        const value = resources[identifier as string];
+        if (value === undefined) throw { error: 'Resource does not exist' };
+        // The shim's own behaviour: parse when it can, otherwise return text.
+        return JSON.parse(JSON.stringify(value)) as unknown;
+      }
+      throw new Error('unexpected action ' + String(action));
+    });
+    Object.defineProperty(window, 'qortalRequest', {
+      configurable: true,
+      writable: true,
+      value: parsedBridge,
+    });
+
+    const result = await loadCatalog(bridgeQdnReadPort, createContentCache(), TEST_PUBLISHER, {
+      now: NOW,
+    });
+
+    expect(result.kind).toBe('loaded');
+    expect(parsedBridge).toHaveBeenCalled();
   });
 
   it('never permanently caches a failure: a later success still loads', async () => {

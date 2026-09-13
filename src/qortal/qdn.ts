@@ -109,7 +109,36 @@ export async function searchQdnResources(
  *
  * No `encoding` is supplied, so the node returns the resource bytes; a
  * Shadow Archives `DOCUMENT` envelope is UTF-8 JSON.
+ *
+ * VERIFIED RESPONSE SHAPE (live `/render/APP/Shadow Archives` frame through the
+ * injected bridge, 2026-09-13, Core `108bf191` / v6.1.9). The shim's
+ * `handleResponse()` runs every `FETCH_QDN_RESOURCE` body through `JSON.parse`
+ * and posts the **parsed value** back as the bridge result; it falls back to the
+ * raw `response.text()` only when the body is not JSON. A JSON `DOCUMENT` body
+ * therefore arrives as an object, not as text, so a string-only check rejects
+ * every real entity/catalog read with "FETCH_QDN_RESOURCE did not return text".
+ * Binary and other non-JSON bodies still arrive as strings.
+ *
+ * Normalizing here (the layer that owns the bridge response contract) keeps the
+ * `QdnReadPort.fetchText(): Promise<string>` contract intact for the whole
+ * domain/validation layer. A JSON round trip preserves the values the validators
+ * consume; it does not preserve source formatting or key order, and nothing in
+ * the domain layer depends on either.
  */
+
+/** Normalize a raw `FETCH_QDN_RESOURCE` bridge result to text, or `null`. */
+export function bridgeFetchResultToText(result: unknown): string | null {
+  if (typeof result === 'string') return result;
+  if (Array.isArray(result) || (typeof result === 'object' && result !== null)) {
+    try {
+      return JSON.stringify(result);
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
 export async function fetchQdnResourceText(
   ref: QdnResourceRef,
   options: RequestOptions = {},
@@ -118,10 +147,11 @@ export async function fetchQdnResourceText(
   if (ref.identifier) params.identifier = ref.identifier;
   if (ref.path) params.filepath = ref.path;
   const result = await request<unknown>(QortalAction.FETCH_QDN_RESOURCE, params, options);
-  if (typeof result !== 'string') {
+  const text = bridgeFetchResultToText(result);
+  if (text === null) {
     throw new Error('FETCH_QDN_RESOURCE did not return text');
   }
-  return result;
+  return text;
 }
 
 /** Raw status response; the caller validates `status`. */

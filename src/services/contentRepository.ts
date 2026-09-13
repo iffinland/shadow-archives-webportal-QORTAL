@@ -1,8 +1,14 @@
+import { listingFromGalleryItem } from '../domain/catalog';
 import { CACHE_TTL_MS, LIMITS, type EntityKind } from '../domain/constants';
 import { validateEntityPayload } from '../domain/entities';
 import { buildEntityIdentifier, resolveEntityReference } from '../domain/identifiers';
 import { dedupeTaxonomy, taxonomyIncludesSlug, toTaxonomyReference } from '../domain/taxonomy';
-import type { CatalogListing, ShadowArchiveEntity, TaxonomyReference } from '../domain/types';
+import type {
+  CatalogListing,
+  QdnMediaReference,
+  ShadowArchiveEntity,
+  TaxonomyReference,
+} from '../domain/types';
 import { getContentCache, isCacheFresh, type CacheRecord, type ContentCache } from './cache';
 import { loadCatalog, type CatalogLoadResult } from './catalogRepository';
 import { ContentError, toContentError } from './errors';
@@ -12,6 +18,7 @@ import {
   type FallbackDiscoveryResult,
 } from './fallbackDiscovery';
 import { entityIdentifierMatches, findExactResource } from './identity';
+import { runBounded } from './queue';
 import { bridgeQdnReadPort, parseJsonPayload, type QdnReadPort } from './qdnReader';
 import { unscopedMessage, type PublisherScope } from './publisher';
 import type { ArchiveDiagnostic, ArchiveSnapshot, EntityDetailResult } from './types';
@@ -110,6 +117,100 @@ export function mergeListings(
   return { listings, added };
 }
 
+export interface ListingMediaHydration {
+  readonly listings: CatalogListing[];
+  readonly hydrated: number;
+  readonly failed: number;
+}
+
+/**
+ * Resolve display data for gallery item listings the derived index does not carry.
+ *
+ * A discovery-only listing carries a locator and, at best, Core's search
+ * metadata: no thumbnail, no canonical title/excerpt and no album membership, so
+ * its card renders as a placeholder and the album page cannot resolve it. The
+ * entity resource stays authoritative and is tiny (bounded by `LIMITS.entityBytes`),
+ * so a bounded number of those listings is hydrated from the entity itself. Only
+ * gallery items are hydrated here, and the full-size `IMAGE`/`VIDEO` media is
+ * still never downloaded for a listing.
+ *
+ * Best effort by contract: a hydration failure keeps the discovery listing
+ * (which still proves the entity exists) and is reported, never fatal.
+ */
+async function hydrateListingMedia(
+  reader: QdnReadPort,
+  publisherName: string,
+  listings: readonly CatalogListing[],
+  options: { readonly cache: ContentCache; readonly now: number },
+): Promise<ListingMediaHydration> {
+  const pending = listings
+    .filter(
+      (listing) =>
+        listing.type === 'gallery-item' &&
+        listing.thumbnail === null &&
+        listing.partitionIdentifier === 'fallback',
+    )
+    .slice(0, LIMITS.listingHydrationMax);
+  if (pending.length === 0) return { listings: [...listings], hydrated: 0, failed: 0 };
+
+  const scope: PublisherScope = { scoped: true, name: publisherName, service: 'DOCUMENT' };
+  const results = await runBounded(pending, LIMITS.entityConcurrency, async (listing) => {
+    const detail = await loadEntityDetail(scope, 'gallery-item', listing.id, {
+      reader,
+      cache: options.cache,
+      now: options.now,
+    });
+    const entity = detail.entity;
+    if (!entity || entity.kind !== 'gallery-item') return null;
+    return listingFromGalleryItem(entity);
+  });
+
+  const hydratedByIdentifier = new Map<string, CatalogListing>();
+  let failed = 0;
+  results.forEach((result, index) => {
+    const listing = pending[index];
+    if (!result.ok || !result.value) {
+      failed += 1;
+      return;
+    }
+    hydratedByIdentifier.set(listing.identifier, result.value);
+  });
+
+  if (hydratedByIdentifier.size === 0) {
+    return { listings: [...listings], hydrated: 0, failed };
+  }
+
+  const merged = listings.map((listing) => hydratedByIdentifier.get(listing.identifier) ?? listing);
+  merged.sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
+  return { listings: merged, hydrated: hydratedByIdentifier.size, failed };
+}
+
+/**
+ * Give a gallery album card the newest member item's thumbnail when the album
+ * entity has no cover of its own.
+ *
+ * Albums currently publish without a cover (`coverThumbnail: null`), so an album
+ * card would otherwise always render the empty placeholder even when the album
+ * contains published media. This is presentation only: the album listing keeps
+ * its own identity and the derived cover is never written back to QDN.
+ */
+export function withDerivedAlbumCovers(listings: readonly CatalogListing[]): CatalogListing[] {
+  const covers = new Map<string, { thumbnail: QdnMediaReference; updatedAt: number }>();
+  for (const listing of listings) {
+    if (listing.type !== 'gallery-item') continue;
+    if (!listing.albumId || !listing.thumbnail) continue;
+    const existing = covers.get(listing.albumId);
+    if (existing && existing.updatedAt >= listing.updatedAt) continue;
+    covers.set(listing.albumId, { thumbnail: listing.thumbnail, updatedAt: listing.updatedAt });
+  }
+  if (covers.size === 0) return [...listings];
+  return listings.map((listing) => {
+    if (listing.type !== 'gallery-album' || listing.thumbnail) return listing;
+    const cover = covers.get(listing.id);
+    return cover ? { ...listing, thumbnail: cover.thumbnail } : listing;
+  });
+}
+
 /**
  * Bounded, metadata-only discovery used to keep the derived index honest.
  *
@@ -182,8 +283,36 @@ export async function loadArchive(
   const catalogListings = catalog.kind === 'loaded' ? catalog.listings : [];
   const merged = mergeListings(catalogListings, discovery?.listings ?? []);
 
+  // The derived index may lag behind a publication (or be unreadable): a
+  // gallery listing it does not carry is resolved from its authoritative entity
+  // so its card can render media and its album membership is known.
+  const hydration = await hydrateListingMedia(reader, scope.name, merged.listings, {
+    cache,
+    now,
+  });
+  const listings = withDerivedAlbumCovers(hydration.listings);
+  const hydrationDiagnostics: ArchiveDiagnostic[] = [];
+  if (hydration.hydrated > 0) {
+    hydrationDiagnostics.push({
+      code: 'listings-hydrated',
+      level: 'info',
+      message: `${hydration.hydrated} published item(s) missing from the archive index were resolved from their authoritative entity.`,
+    });
+  }
+  if (hydration.failed > 0) {
+    hydrationDiagnostics.push({
+      code: 'listings-hydration-failed',
+      level: 'warning',
+      message: `${hydration.failed} published item(s) missing from the archive index could not be resolved from their entity.`,
+    });
+  }
+
   if (catalog.kind === 'loaded') {
-    const diagnostics = [...catalog.diagnostics, ...(discovery?.diagnostics ?? [])];
+    const diagnostics = [
+      ...catalog.diagnostics,
+      ...(discovery?.diagnostics ?? []),
+      ...hydrationDiagnostics,
+    ];
     const reconciled = merged.added > 0;
     const partial = catalog.partial || catalog.rejectedEntries > 0 || reconciled;
     if (reconciled) {
@@ -195,8 +324,8 @@ export async function loadArchive(
     }
     const base = {
       source: 'catalog' as const,
-      listings: merged.listings,
-      taxonomy: aggregateTaxonomy(merged.listings),
+      listings,
+      taxonomy: aggregateTaxonomy(listings),
       compiledAt: catalog.manifest.compiledAt,
       stale: catalog.stale,
       partial,
@@ -281,7 +410,7 @@ export async function loadArchive(
     );
   }
 
-  const fatal = discovery.errors.length > 0 && merged.listings.length === 0;
+  const fatal = discovery.errors.length > 0 && listings.length === 0;
   if (fatal) {
     const first = discovery.errors[0];
     return emptySnapshot(
@@ -292,21 +421,21 @@ export async function loadArchive(
     );
   }
 
-  const taxonomy = aggregateTaxonomy(merged.listings);
+  const taxonomy = aggregateTaxonomy(listings);
   return {
     status: 'partial',
     source: 'fallback',
-    listings: merged.listings,
+    listings,
     taxonomy,
     compiledAt: null,
     stale: false,
     partial: true,
     message:
-      merged.listings.length === 0
+      listings.length === 0
         ? 'The archive catalog index is unavailable. A bounded live search found no matching resources; this is not proof that the archive is empty.'
         : 'The archive catalog index is unavailable; showing bounded live search results that may be incomplete.',
     error: null,
-    diagnostics: [...fallbackDiagnostics, ...discovery.diagnostics],
+    diagnostics: [...fallbackDiagnostics, ...discovery.diagnostics, ...hydrationDiagnostics],
   };
 }
 
