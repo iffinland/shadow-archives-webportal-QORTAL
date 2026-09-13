@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  bridgeFetchResultToText,
   buildQdnResourcePath,
   buildSameOriginSearchPath,
   buildSameOriginStatusPath,
@@ -154,6 +155,44 @@ describe('bridge read primitives', () => {
       name: 'Shadow Archives',
       identifier: 'saw_post_abc',
     });
+  });
+
+  it('normalizes a JSON-parsed bridge result back to text (live render-frame contract)', async () => {
+    // VERIFIED 2026-09-13 in the real `/render/APP/Shadow Archives` frame: the
+    // injected shim JSON-parses a JSON body and posts the object back as the
+    // bridge result. A string-only check rejected every real DOCUMENT read.
+    const body = { schemaVersion: 1, kind: 'gallery-item', id: 'askdqb7749wh' };
+    const bridge = installBridge(() => body);
+
+    const text = await fetchQdnResourceText({
+      service: 'DOCUMENT',
+      name: 'Shadow Archives',
+      identifier: 'saw_img_askdqb7749wh',
+    });
+
+    expect(typeof text).toBe('string');
+    expect(JSON.parse(text)).toEqual(body);
+    expect(bridge).toHaveBeenCalledWith({
+      action: 'FETCH_QDN_RESOURCE',
+      service: 'DOCUMENT',
+      name: 'Shadow Archives',
+      identifier: 'saw_img_askdqb7749wh',
+    });
+  });
+
+  it('normalizes a parsed JSON array as well as an object', () => {
+    expect(bridgeFetchResultToText([{ id: 'a' }])).toBe('[{"id":"a"}]');
+    expect(bridgeFetchResultToText({ id: 'a' })).toBe('{"id":"a"}');
+    expect(bridgeFetchResultToText('raw')).toBe('raw');
+    expect(bridgeFetchResultToText(null)).toBeNull();
+    expect(bridgeFetchResultToText(3)).toBeNull();
+  });
+
+  it('rejects a result that is neither text nor a JSON value', async () => {
+    installBridge(() => 3);
+    await expect(
+      fetchQdnResourceText({ service: 'DOCUMENT', name: 'Name', identifier: 'i' }),
+    ).rejects.toThrow(/did not return text/);
   });
 
   it('omits a null identifier when fetching a default resource', async () => {

@@ -7,12 +7,14 @@ import {
   type EntityKind,
 } from './constants';
 import { buildEntityIdentifier, isStableId } from './identifiers';
+import { normalizeTaxonomySlug } from './taxonomy';
 import { validateMediaReference } from './entities';
 import type {
   CatalogEntry,
   CatalogListing,
   CatalogManifest,
   CatalogPartitionDescriptor,
+  GalleryItem,
 } from './types';
 import {
   boundedArray,
@@ -144,6 +146,44 @@ function readTaxonomyArray(value: unknown): readonly string[] {
     labels.push(trimmed);
   }
   return labels;
+}
+
+/**
+ * Catalog listing built directly from an authoritative gallery item entity.
+ *
+ * The partition identifier marks provenance: an entry that belongs to no
+ * manifest partition (for example one hydrated from the entity because the
+ * derived index does not carry it yet) is not a catalog entry, and the publish
+ * planner may re-index it into the target partition.
+ */
+export function listingFromGalleryItem(
+  item: GalleryItem,
+  partitionIdentifier = 'entity',
+): CatalogListing {
+  return {
+    id: item.id,
+    type: 'gallery-item',
+    service: 'DOCUMENT',
+    identifier: buildEntityIdentifier('gallery-item', item.id),
+    title: item.data.title,
+    slug: normalizeTaxonomySlug(item.data.title) ?? '',
+    excerpt: item.data.description.slice(0, LIMITS.excerpt),
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    categories: item.data.categories.slice(0, LIMITS.taxonomyArray),
+    tags: item.data.tags.slice(0, LIMITS.taxonomyArray),
+    thumbnail: item.data.thumbnail,
+    state: item.state,
+    contentHash: null,
+    likeCount: null,
+    commentCount: null,
+    countsCompiledAt: null,
+    durationSeconds: null,
+    width: item.data.width,
+    height: item.data.height,
+    albumId: item.data.albumId,
+    partitionIdentifier,
+  };
 }
 
 export function validateCatalogEntry(
