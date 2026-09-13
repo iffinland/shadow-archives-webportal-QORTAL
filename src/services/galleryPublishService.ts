@@ -24,7 +24,7 @@ import {
   generateUniqueStableId,
   type RandomBytes,
 } from '../domain/identifiers';
-import type { GalleryAlbum, GalleryItem, QdnMediaReference } from '../domain/types';
+import type { CatalogListing, GalleryAlbum, GalleryItem, QdnMediaReference } from '../domain/types';
 import { getNameData } from '../qortal/auth';
 import { QortalBridgeError } from '../qortal/bridge';
 import {
@@ -45,8 +45,10 @@ import {
   type CatalogChecksumFn,
   type CatalogWritePlan,
 } from './catalogWriter';
-import { invalidateCatalogCache, loadCatalog } from './catalogRepository';
-import { invalidateEntityCache } from './contentRepository';
+import { invalidateCatalogCache, loadCatalog, type CatalogLoadResult } from './catalogRepository';
+import { invalidateEntityCache, loadEntityDetail } from './contentRepository';
+import { discoverArchive } from './fallbackDiscovery';
+import type { PublisherScope } from './publisher';
 import { findExactResource, type ExpectedIdentity } from './identity';
 import {
   browserImageProcessingDeps,
@@ -163,6 +165,8 @@ export interface GalleryPublishDeps {
   readonly random?: RandomBytes;
   readonly checksumFn?: CatalogChecksumFn;
   readonly imageDeps?: ImageProcessingDeps;
+  /** Injectable sleep used only by the bounded index-read retry. */
+  readonly delay?: (ms: number) => Promise<void>;
 }
 
 /** Default dependencies: the injected bridge for reads/writes and the shared cache. */
@@ -177,6 +181,7 @@ export function createGalleryPublishDeps(
     random: overrides.random,
     checksumFn: overrides.checksumFn,
     imageDeps: overrides.imageDeps ?? browserImageProcessingDeps,
+    delay: overrides.delay,
   };
 }
 
@@ -336,22 +341,124 @@ interface CatalogContextBase {
   readonly skipReason: string | null;
 }
 
+/** Bounded retries when the index data is not yet available on the read node. */
+const CATALOG_READ_MAX_ATTEMPTS = 3;
+const CATALOG_READ_RETRY_MS = 600;
+
+/** Bound on entity payload fetches while repairing the derived index. */
+const CATALOG_REPAIR_FETCH_LIMIT = 25;
+
+function defaultDelay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Read the derived index, retrying a transient read failure a bounded number of
+ * times. Data availability on a Qortal node lags the search index: a resource
+ * can be discoverable while its bytes are still `MISSING_DATA`/`DOWNLOADING`.
+ * Without a retry, that transient state was treated as a permanently unreadable
+ * index and the newly published entity was never added to the catalog.
+ */
+async function loadCatalogForPublish(
+  deps: GalleryPublishDeps,
+  publisherName: string,
+): Promise<CatalogLoadResult> {
+  const attempt = (): Promise<CatalogLoadResult> =>
+    loadCatalog(deps.reader, deps.cache, publisherName, { now: deps.now(), force: true });
+  let result = await attempt();
+  for (let round = 1; round < CATALOG_READ_MAX_ATTEMPTS && result.kind === 'error'; round += 1) {
+    await (deps.delay ?? defaultDelay)(CATALOG_READ_RETRY_MS);
+    result = await attempt();
+  }
+  return result;
+}
+
+const RECONCILABLE_KINDS = ['gallery-item', 'gallery-album'] as const;
+
+function isReconcilableKind(kind: EntityKind): kind is 'gallery-item' | 'gallery-album' {
+  return (RECONCILABLE_KINDS as readonly string[]).includes(kind);
+}
+
+/**
+ * Restore index entries for authoritative entities that the catalog is missing.
+ *
+ * A publication whose index update failed (or was skipped) leaves its entity out
+ * of the derived index forever, because every later write plans from the catalog
+ * alone. Bounded discovery finds those entities and their payloads rebuild a
+ * rich entry (thumbnail, dimensions, taxonomy), so a later successful write
+ * converges the index instead of preserving the gap.
+ *
+ * Best-effort by design: a failure here degrades to the untouched catalog and
+ * never blocks the authoritative content write.
+ */
+async function repairExistingListings(
+  deps: GalleryPublishDeps,
+  publisherName: string,
+  type: EntityKind,
+  existing: CatalogContextBase['existing'],
+): Promise<CatalogContextBase['existing']> {
+  if (!isReconcilableKind(type)) return existing;
+  const known = new Set(existing.listings.map((listing) => listing.identifier));
+
+  let discovered;
+  try {
+    discovered = await discoverArchive(deps.reader, publisherName, { kinds: [type] });
+  } catch {
+    return existing;
+  }
+
+  const missing = discovered.listings
+    .filter((listing) => !known.has(listing.identifier))
+    .slice(0, CATALOG_REPAIR_FETCH_LIMIT);
+  if (missing.length === 0) return existing;
+
+  const scope: PublisherScope = { scoped: true, name: publisherName, service: 'DOCUMENT' };
+  const restored: CatalogListing[] = [];
+  for (const listing of missing) {
+    try {
+      const detail = await loadEntityDetail(scope, type, listing.id, {
+        reader: deps.reader,
+        cache: deps.cache,
+      });
+      const entity = detail.entity;
+      if (!entity) continue;
+      const contentHash = await safeContentHash(deps, entity.data);
+      if (entity.kind === 'gallery-item') {
+        restored.push({
+          ...catalogEntryFromGalleryItem(entity, contentHash),
+          type,
+          partitionIdentifier: '',
+        });
+      } else if (entity.kind === 'gallery-album') {
+        restored.push({
+          ...catalogEntryFromGalleryAlbum(entity, contentHash),
+          type,
+          partitionIdentifier: '',
+        });
+      }
+    } catch {
+      // A repair fetch failure must never block the publish.
+    }
+  }
+  if (restored.length === 0) return existing;
+  return { manifest: existing.manifest, listings: [...existing.listings, ...restored] };
+}
+
 /**
  * Read the current derived index before any write.
  *
- * Only a genuinely missing catalog is bootstrapped. A catalog that is invalid,
- * unreadable or only partially readable is left untouched, because republishing
- * it from a partial view could drop entries; the authoritative content is still
- * published and the read path falls back to a prefix scan.
+ * A genuinely missing catalog is bootstrapped and a readable catalog is repaired
+ * in place. A catalog that is invalid, unreadable or only partially readable is
+ * still left untouched, because republishing it from a partial view could drop
+ * entries; the authoritative content is still published and the read path
+ * reconciles it with bounded discovery.
  */
 async function readCatalogContext(
   deps: GalleryPublishDeps,
   publisherName: string,
+  type: EntityKind,
 ): Promise<CatalogContextBase> {
-  const catalog = await loadCatalog(deps.reader, deps.cache, publisherName, {
-    now: deps.now(),
-    force: true,
-  });
+  const catalog = await loadCatalogForPublish(deps, publisherName);
 
   if (catalog.kind === 'error') {
     return {
@@ -374,13 +481,12 @@ async function readCatalogContext(
         'The Gallery index could not be read completely, so it was left untouched to avoid dropping existing entries.',
     };
   }
-  return {
-    existing:
-      catalog.kind === 'loaded'
-        ? { manifest: catalog.manifest, listings: catalog.listings }
-        : { manifest: null, listings: [] },
-    skipReason: null,
-  };
+  const base =
+    catalog.kind === 'loaded'
+      ? { manifest: catalog.manifest, listings: catalog.listings }
+      : { manifest: null, listings: [] };
+  const repaired = await repairExistingListings(deps, publisherName, type, base);
+  return { existing: repaired, skipReason: null };
 }
 
 async function planCatalogFromContext(
@@ -629,7 +735,7 @@ export async function publishGalleryImage(
   // Read the derived index before any write so an unreadable catalog is detected
   // up front (it must not block the authoritative content write) and the progress
   // counter can describe the concrete plan truthfully.
-  const catalogBase = await readCatalogContext(deps, publisherName);
+  const catalogBase = await readCatalogContext(deps, publisherName, 'gallery-item');
   const emit = createProgressEmitter(options.onProgress, catalogBase.skipReason ? 8 : 11);
   emit('preparing-media', 'Preparing image and thumbnail');
   let processed: GalleryImageProcessingResult;
@@ -938,7 +1044,7 @@ export async function publishGalleryAlbum(
 
   authorityCheck(ctx, publisherName);
 
-  const catalogBase = await readCatalogContext(deps, publisherName);
+  const catalogBase = await readCatalogContext(deps, publisherName, 'gallery-album');
   const emit = createProgressEmitter(options.onProgress, catalogBase.skipReason ? 4 : 7);
 
   const now = deps.now();

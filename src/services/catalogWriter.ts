@@ -174,6 +174,44 @@ function partitionNumber(identifier: string, token: string): number | null {
   return Number.isInteger(value) ? value : null;
 }
 
+function listingToEntry(listing: CatalogListing): CatalogEntry {
+  return {
+    id: listing.id,
+    service: listing.service,
+    identifier: listing.identifier,
+    title: listing.title,
+    slug: listing.slug,
+    excerpt: listing.excerpt,
+    createdAt: listing.createdAt,
+    updatedAt: listing.updatedAt,
+    categories: listing.categories,
+    tags: listing.tags,
+    thumbnail: listing.thumbnail,
+    state: listing.state,
+    contentHash: listing.contentHash,
+    likeCount: listing.likeCount,
+    commentCount: listing.commentCount,
+    countsCompiledAt: listing.countsCompiledAt,
+    durationSeconds: listing.durationSeconds,
+    width: listing.width,
+    height: listing.height,
+    albumId: listing.albumId,
+  };
+}
+
+/**
+ * A catalog entry the read validator will accept. Rebuilt entries come from
+ * already-validated entities, but the planner must never let one malformed
+ * candidate make `assertCatalogPlanValid` reject an otherwise good rebuild.
+ */
+function isPlannableEntry(entry: CatalogEntry): boolean {
+  return (
+    entry.title.trim().length > 0 &&
+    entry.title.length <= LIMITS.title &&
+    entry.excerpt.length <= LIMITS.excerpt
+  );
+}
+
 function entriesForPartition(
   listings: readonly CatalogListing[],
   identifier: string,
@@ -181,28 +219,12 @@ function entriesForPartition(
   return listings
     .filter((listing) => listing.partitionIdentifier === identifier)
     .sort((a, b) => a.updatedAt - b.updatedAt || a.id.localeCompare(b.id))
-    .map((listing): CatalogEntry => ({
-      id: listing.id,
-      service: listing.service,
-      identifier: listing.identifier,
-      title: listing.title,
-      slug: listing.slug,
-      excerpt: listing.excerpt,
-      createdAt: listing.createdAt,
-      updatedAt: listing.updatedAt,
-      categories: listing.categories,
-      tags: listing.tags,
-      thumbnail: listing.thumbnail,
-      state: listing.state,
-      contentHash: listing.contentHash,
-      likeCount: listing.likeCount,
-      commentCount: listing.commentCount,
-      countsCompiledAt: listing.countsCompiledAt,
-      durationSeconds: listing.durationSeconds,
-      width: listing.width,
-      height: listing.height,
-      albumId: listing.albumId,
-    }));
+    .map(listingToEntry);
+}
+
+/** Upsert by identifier so a rebuild can never duplicate or drop the new entry. */
+function upsertEntry(entries: readonly CatalogEntry[], entry: CatalogEntry): CatalogEntry[] {
+  return [...entries.filter((candidate) => candidate.identifier !== entry.identifier), entry];
 }
 
 function mergeLabels(existing: readonly string[], added: readonly string[]): string[] {
@@ -256,6 +278,24 @@ export async function planCatalogWrite(
   const createdCatalog = existingManifest === null;
   const catalogVersion = createdCatalog ? 1 : existingManifest.catalogVersion + 1;
   const allDescriptors = existingManifest?.partitions ?? [];
+  const typedDescriptorIds = new Set(
+    allDescriptors
+      .filter((descriptor) => descriptor.type === type)
+      .map((descriptor) => descriptor.identifier),
+  );
+
+  // Listings of this type that belong to no known partition (for example a
+  // resource restored from bounded discovery during an index repair) are
+  // re-indexed into the target partition instead of being silently dropped from
+  // the rebuilt manifest. Invalid candidates are ignored rather than allowed to
+  // fail the whole plan.
+  const unassignedEntries: CatalogEntry[] = [];
+  for (const listing of existing.listings) {
+    if (listing.type !== type) continue;
+    if (typedDescriptorIds.has(listing.partitionIdentifier)) continue;
+    const candidate = listingToEntry(listing);
+    if (isPlannableEntry(candidate)) unassignedEntries.push(candidate);
+  }
 
   // Existing partitions of this type, ordered by their numeric index.
   const typedPartitions: { identifier: string; index: number; entries: CatalogEntry[] }[] = [];
@@ -284,10 +324,7 @@ export async function planCatalogWrite(
   if (holding) {
     targetIdentifier = holding.identifier;
     targetPartitionIndex = holding.index;
-    targetEntries = holding.entries.filter(
-      (candidate) => candidate.identifier !== entry.identifier,
-    );
-    targetEntries.push(entry);
+    targetEntries = upsertEntry([...holding.entries, ...unassignedEntries], entry);
   } else {
     const withRoom = [...typedPartitions]
       .reverse()
@@ -295,7 +332,7 @@ export async function planCatalogWrite(
     if (withRoom) {
       targetIdentifier = withRoom.identifier;
       targetPartitionIndex = withRoom.index;
-      targetEntries = [...withRoom.entries, entry];
+      targetEntries = upsertEntry([...withRoom.entries, ...unassignedEntries], entry);
     } else {
       const nextIndex =
         typedPartitions.length === 0 ? 0 : typedPartitions[typedPartitions.length - 1].index + 1;
@@ -304,7 +341,7 @@ export async function planCatalogWrite(
       }
       targetPartitionIndex = nextIndex;
       targetIdentifier = `saw_cat_${token}_p${String(nextIndex).padStart(3, '0')}`;
-      targetEntries = [entry];
+      targetEntries = upsertEntry(unassignedEntries, entry);
     }
   }
 

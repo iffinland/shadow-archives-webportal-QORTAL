@@ -4,9 +4,13 @@ import { buildEntityIdentifier, resolveEntityReference } from '../domain/identif
 import { dedupeTaxonomy, taxonomyIncludesSlug, toTaxonomyReference } from '../domain/taxonomy';
 import type { CatalogListing, ShadowArchiveEntity, TaxonomyReference } from '../domain/types';
 import { getContentCache, isCacheFresh, type CacheRecord, type ContentCache } from './cache';
-import { loadCatalog } from './catalogRepository';
+import { loadCatalog, type CatalogLoadResult } from './catalogRepository';
 import { ContentError, toContentError } from './errors';
-import { discoverArchive } from './fallbackDiscovery';
+import {
+  discoverArchive,
+  type FallbackDiscoveryOptions,
+  type FallbackDiscoveryResult,
+} from './fallbackDiscovery';
 import { entityIdentifierMatches, findExactResource } from './identity';
 import { bridgeQdnReadPort, parseJsonPayload, type QdnReadPort } from './qdnReader';
 import { unscopedMessage, type PublisherScope } from './publisher';
@@ -81,12 +85,74 @@ export interface LoadArchiveOptions {
 }
 
 /**
+ * Merge authoritative live-discovery listings into catalog listings.
+ *
+ * The catalog is a derived index: it is permitted to be stale or incomplete. A
+ * catalog entry wins on an identifier conflict because it carries the richer
+ * compiled summary; a listing that discovery found but the index does not carry
+ * is added, so a missing/incomplete index can never hide a published entity.
+ */
+export function mergeListings(
+  catalogListings: readonly CatalogListing[],
+  discoveredListings: readonly CatalogListing[],
+): { readonly listings: CatalogListing[]; readonly added: number } {
+  const byIdentifier = new Map<string, CatalogListing>();
+  for (const listing of catalogListings) byIdentifier.set(listing.identifier, listing);
+  let added = 0;
+  for (const listing of discoveredListings) {
+    if (byIdentifier.has(listing.identifier)) continue;
+    byIdentifier.set(listing.identifier, listing);
+    added += 1;
+  }
+  const listings = [...byIdentifier.values()].sort(
+    (a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id),
+  );
+  return { listings, added };
+}
+
+/**
+ * Bounded, metadata-only discovery used to keep the derived index honest.
+ *
+ * It costs a few prefix searches and never downloads an entity body, so it is
+ * safe to run alongside the catalog on every load. It is best-effort: a failure
+ * is reported, never fatal on its own.
+ */
+async function discoverAuthoritative(
+  reader: QdnReadPort,
+  publisherName: string,
+  options: FallbackDiscoveryOptions = {},
+): Promise<FallbackDiscoveryResult | null> {
+  try {
+    return await discoverArchive(reader, publisherName, options);
+  } catch {
+    return null;
+  }
+}
+
+/** `loadCatalog` normalized to a result; a thrown transport error is a result. */
+async function loadCatalogSafely(
+  reader: QdnReadPort,
+  cache: ContentCache,
+  publisherName: string,
+  now: number,
+  force: boolean | undefined,
+): Promise<CatalogLoadResult> {
+  try {
+    return await loadCatalog(reader, cache, publisherName, { now, force });
+  } catch (error) {
+    return { kind: 'error', error: toContentError(error) };
+  }
+}
+
+/**
  * Load the archive snapshot.
  *
- * Catalog first (authoritative entity resources remain the source of truth), then
- * a bounded read-only fallback when the catalog is absent, corrupt or
- * unsupported. A failed catalog *read* (network) is reported as an error rather
- * than silently retried as a fallback discovery.
+ * The catalog is the primary index (authoritative entity resources remain the
+ * source of truth), but it never proves completeness. A bounded read-only
+ * discovery runs alongside it and is merged in, and it is also the recovery path
+ * when the catalog is absent, corrupt, unsupported or unreadable — matching the
+ * contract's rule that catalog absence/unavailability must never be presented as
+ * "no content" and that recovery is a direct prefix search.
  */
 export async function loadArchive(
   scope: PublisherScope,
@@ -103,28 +169,41 @@ export async function loadArchive(
   const cache = options.cache ?? getContentCache();
   const now = options.now ?? Date.now();
 
-  let catalog;
-  try {
-    catalog = await loadCatalog(reader, cache, scope.name, { now, force: options.force });
-  } catch (error) {
-    return emptySnapshot('error', 'Archive discovery failed.', toContentError(error));
-  }
+  const catalog = await loadCatalogSafely(reader, cache, scope.name, now, options.force);
+
+  // A readable catalog is the primary index, so reconciliation only needs to
+  // cover recent index lag: one newest-first page per kind. An unusable catalog
+  // uses the full bounded fallback discovery instead.
+  const discovery = await discoverAuthoritative(
+    reader,
+    scope.name,
+    catalog.kind === 'loaded' ? { maxPages: 1 } : {},
+  );
+  const catalogListings = catalog.kind === 'loaded' ? catalog.listings : [];
+  const merged = mergeListings(catalogListings, discovery?.listings ?? []);
 
   if (catalog.kind === 'loaded') {
-    const listings = catalog.listings;
-    const taxonomy = aggregateTaxonomy(listings);
-    const diagnostics = catalog.diagnostics;
+    const diagnostics = [...catalog.diagnostics, ...(discovery?.diagnostics ?? [])];
+    const reconciled = merged.added > 0;
+    const partial = catalog.partial || catalog.rejectedEntries > 0 || reconciled;
+    if (reconciled) {
+      diagnostics.push({
+        code: 'catalog-reconciled',
+        level: 'info',
+        message: `${merged.added} published item(s) were missing from the archive index and were restored from live discovery.`,
+      });
+    }
     const base = {
       source: 'catalog' as const,
-      listings,
-      taxonomy,
+      listings: merged.listings,
+      taxonomy: aggregateTaxonomy(merged.listings),
       compiledAt: catalog.manifest.compiledAt,
       stale: catalog.stale,
-      partial: catalog.partial,
+      partial,
       diagnostics,
     };
 
-    if (listings.length === 0) {
+    if (base.listings.length === 0) {
       return {
         ...base,
         status: 'empty',
@@ -140,6 +219,15 @@ export async function loadArchive(
         error: null,
       };
     }
+    if (reconciled) {
+      return {
+        ...base,
+        status: 'partial',
+        message:
+          'The archive index was out of date; it has been reconciled with live discovery and listings may be incomplete.',
+        error: null,
+      };
+    }
     if (catalog.partial) {
       return {
         ...base,
@@ -151,17 +239,21 @@ export async function loadArchive(
     return { ...base, status: 'ready', message: null, error: null };
   }
 
-  if (catalog.kind === 'error') {
-    return emptySnapshot('error', 'The archive catalog could not be read.', catalog.error);
-  }
-
-  // Catalog is missing or structurally unusable: bounded live discovery.
+  // Catalog missing, invalid or unreadable: bounded live discovery is the
+  // recovery path. The catalog failure is reported as a diagnostic, never as an
+  // empty/error-only snapshot that hides published content.
   const fallbackDiagnostics: ArchiveDiagnostic[] = [];
   if (catalog.kind === 'invalid') {
     fallbackDiagnostics.push({
       code: 'catalog-invalid',
       level: 'warning',
       message: 'The archive catalog index is unavailable or invalid.',
+    });
+  } else if (catalog.kind === 'error') {
+    fallbackDiagnostics.push({
+      code: 'catalog-unreadable',
+      level: 'warning',
+      message: 'The archive catalog index could not be read; showing live discovery instead.',
     });
   } else {
     fallbackDiagnostics.push({
@@ -171,19 +263,25 @@ export async function loadArchive(
     });
   }
 
-  let discovery;
-  try {
-    discovery = await discoverArchive(reader, scope.name);
-  } catch (error) {
+  if (discovery === null) {
+    const error =
+      catalog.kind === 'error'
+        ? catalog.error
+        : new ContentError({
+            kind: 'unknown',
+            message: 'Live archive discovery failed.',
+          });
     return emptySnapshot(
       'error',
-      'Live archive discovery failed.',
-      toContentError(error),
+      catalog.kind === 'error'
+        ? 'The archive catalog could not be read and live discovery failed.'
+        : 'Live archive discovery failed.',
+      error,
       fallbackDiagnostics,
     );
   }
 
-  const fatal = discovery.errors.length > 0 && discovery.listings.length === 0;
+  const fatal = discovery.errors.length > 0 && merged.listings.length === 0;
   if (fatal) {
     const first = discovery.errors[0];
     return emptySnapshot(
@@ -194,17 +292,17 @@ export async function loadArchive(
     );
   }
 
-  const taxonomy = aggregateTaxonomy(discovery.listings);
+  const taxonomy = aggregateTaxonomy(merged.listings);
   return {
     status: 'partial',
     source: 'fallback',
-    listings: discovery.listings,
+    listings: merged.listings,
     taxonomy,
     compiledAt: null,
     stale: false,
     partial: true,
     message:
-      discovery.listings.length === 0
+      merged.listings.length === 0
         ? 'The archive catalog index is unavailable. A bounded live search found no matching resources; this is not proof that the archive is empty.'
         : 'The archive catalog index is unavailable; showing bounded live search results that may be incomplete.',
     error: null,

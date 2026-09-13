@@ -14,6 +14,7 @@ import { createRecordingReader, makeSearchHit } from '../test/fixtures/qdn';
 import {
   TEST_BLOG_FIXTURE,
   TEST_BLOG_ID,
+  TEST_ITEM_ID,
   TEST_MANIFEST_FIXTURE,
   TEST_PARTITION_FIXTURE,
   TEST_PUBLISHER,
@@ -221,6 +222,69 @@ describe('loadArchive', () => {
     });
     expect(snapshot.status).toBe('error');
     expect(snapshot.error).not.toBeNull();
+  });
+
+  it('restores published entities the catalog is missing, from live discovery', async () => {
+    const resources = catalogResources();
+    const reader = createRecordingReader(
+      (request) => {
+        if (request.prefix && request.identifier === `saw_img_`) {
+          return [makeSearchHit('DOCUMENT', TEST_PUBLISHER, `saw_img_${TEST_ITEM_ID}`)];
+        }
+        if (typeof request.identifier === 'string' && request.identifier in resources) {
+          return [makeSearchHit('DOCUMENT', TEST_PUBLISHER, request.identifier)];
+        }
+        return [];
+      },
+      (ref) => {
+        const value = resources[ref.identifier ?? ''];
+        if (value === undefined) throw new Error('not found');
+        return JSON.stringify(value);
+      },
+    );
+
+    const snapshot = await loadArchive(SCOPED, {
+      reader,
+      cache: createContentCache(),
+      now: NOW,
+    });
+
+    // The catalog is readable and still supplies the primary summaries, but a
+    // published entity it does not carry is recovered from bounded discovery.
+    expect(snapshot.source).toBe('catalog');
+    expect(snapshot.partial).toBe(true);
+    expect(snapshot.status).toBe('partial');
+    expect(snapshot.listings.map((listing) => listing.id)).toContain(TEST_ITEM_ID);
+    expect(snapshot.diagnostics.some((entry) => entry.code === 'catalog-reconciled')).toBe(true);
+  });
+
+  it('falls back to bounded live discovery when the catalog data cannot be read', async () => {
+    const reader = createRecordingReader(
+      (request) => {
+        if (request.prefix && request.identifier === 'saw_post_') {
+          return [makeSearchHit('DOCUMENT', TEST_PUBLISHER, `saw_post_${TEST_BLOG_ID}`)];
+        }
+        if (request.identifier === 'saw_cat_manifest') {
+          return [makeSearchHit('DOCUMENT', TEST_PUBLISHER, 'saw_cat_manifest')];
+        }
+        return [];
+      },
+      () => {
+        // The node can serve metadata while the resource bytes are missing.
+        throw new Error('Data unavailable. Please try again later.');
+      },
+    );
+
+    const snapshot = await loadArchive(SCOPED, {
+      reader,
+      cache: createContentCache(),
+      now: NOW,
+    });
+
+    expect(snapshot.source).toBe('fallback');
+    expect(snapshot.status).toBe('partial');
+    expect(snapshot.listings.map((listing) => listing.id)).toEqual([TEST_BLOG_ID]);
+    expect(snapshot.diagnostics.some((entry) => entry.code === 'catalog-unreadable')).toBe(true);
   });
 
   it('falls back to bounded live discovery when the catalog is absent, and stays partial', async () => {

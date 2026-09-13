@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { makeEnvironment } from '../test/environment';
+import { createRecordingReader, makeSearchHit } from '../test/fixtures/qdn';
 import { validateCatalogManifest, validateCatalogPartition } from '../domain/catalog';
 import { validateEntityPayload } from '../domain/entities';
 import type { CatalogListing, GalleryAlbum, GalleryItem } from '../domain/types';
@@ -12,7 +13,12 @@ import type {
   PublishResourceInput,
   PublishSubmission,
 } from '../qortal/publish';
-import type { CachePutOptions, CacheRecord, ContentCache } from './cache';
+import {
+  createContentCache,
+  type CachePutOptions,
+  type CacheRecord,
+  type ContentCache,
+} from './cache';
 import type { ImageProcessingDeps } from './imageProcessing';
 import type { QdnReadPort, QdnSearchHit } from './qdnReader';
 import {
@@ -22,7 +28,7 @@ import {
 } from './catalogWriter';
 import { catalogEntryFromGalleryAlbum } from './catalogWriter';
 import { loadCatalog } from './catalogRepository';
-import { loadEntityDetail } from './contentRepository';
+import { loadArchive, loadEntityDetail } from './contentRepository';
 import { resolvePublisherScope } from './publisher';
 import {
   createGalleryPublishDeps,
@@ -279,6 +285,8 @@ function makeDeps(overrides: Partial<GalleryPublishDeps> = {}): GalleryPublishDe
     random: overrides.random ?? counterRandom(),
     checksumFn: overrides.checksumFn ?? (async () => 'sha256:fixture'),
     imageDeps: overrides.imageDeps ?? fakeImageDeps(),
+    // Retry sleeps are exercised by their own test; keep the rest instant.
+    delay: overrides.delay ?? (async () => undefined),
   });
 }
 
@@ -815,6 +823,146 @@ describe('publishGalleryImage — catalog', () => {
     // media + entity only: the derived index was left untouched.
     expect(writer.calls).toHaveLength(2);
   });
+
+  it('retries a transient index read before treating the index as unavailable', async () => {
+    const writer = writerFake();
+    const base = readerWithResources([
+      {
+        service: 'DOCUMENT',
+        name: PUBLISHER,
+        identifier: 'saw_cat_manifest',
+        text: JSON.stringify(existingManifest(3, 1)),
+      },
+      {
+        service: 'DOCUMENT',
+        name: PUBLISHER,
+        identifier: 'saw_cat_img_p000',
+        text: JSON.stringify(existingPartition([existingItemEntry('existing0001')])),
+      },
+    ]);
+    let manifestReads = 0;
+    const reader: QdnReadPort = {
+      search: (request, options) => base.search(request, options),
+      async fetchText(ref, options) {
+        if (ref.identifier === 'saw_cat_manifest' && manifestReads === 0) {
+          manifestReads += 1;
+          throw new QortalBridgeError(
+            'error',
+            'Data unavailable. Please try again later.',
+            'FETCH_QDN_RESOURCE',
+          );
+        }
+        return base.fetchText(ref, options);
+      },
+    };
+    const deps = makeDeps({ writer: writer.port, reader });
+    installNameBridge();
+
+    const result = await publishGalleryImage(
+      ownerContext(),
+      imageDraft({ id: FIXED_ID }),
+      {},
+      deps,
+    );
+
+    // The first manifest read failed with a transient availability error; the
+    // bounded retry succeeded and the entity reached the index.
+    expect(manifestReads).toBe(1);
+    expect(result.status).toBe('published');
+    expect(result.indexUpdated).toBe(true);
+    expect(writer.calls).toHaveLength(3);
+  });
+
+  it('re-indexes an authoritative gallery item a previous publish left out of the catalog', async () => {
+    const ORPHAN_ID = 'orphan000001';
+    const orphanEntity = {
+      schemaVersion: 1,
+      kind: 'gallery-item',
+      id: ORPHAN_ID,
+      publisher: PUBLISHER,
+      createdAt: 5,
+      updatedAt: 5,
+      state: 'active',
+      data: {
+        title: 'Recovered plate',
+        description: 'A previous index update was skipped.',
+        albumId: null,
+        media: {
+          service: 'IMAGE',
+          name: PUBLISHER,
+          identifier: `saw_img_media_${ORPHAN_ID}`,
+          mimeType: 'image/webp',
+        },
+        thumbnail: {
+          service: 'THUMBNAIL',
+          name: PUBLISHER,
+          identifier: `saw_img_thumb_${ORPHAN_ID}`,
+          mimeType: 'image/webp',
+        },
+        width: 640,
+        height: 480,
+        categories: [],
+        tags: [],
+        language: 'en',
+      },
+    };
+    const base = readerWithResources([
+      {
+        service: 'DOCUMENT',
+        name: PUBLISHER,
+        identifier: 'saw_cat_manifest',
+        text: JSON.stringify(existingManifest(3, 1)),
+      },
+      {
+        service: 'DOCUMENT',
+        name: PUBLISHER,
+        identifier: 'saw_cat_img_p000',
+        text: JSON.stringify(existingPartition([existingItemEntry('existing0001')])),
+      },
+      {
+        service: 'DOCUMENT',
+        name: PUBLISHER,
+        identifier: `saw_img_${ORPHAN_ID}`,
+        text: JSON.stringify(orphanEntity),
+      },
+    ]);
+    const reader: QdnReadPort = {
+      async search(request) {
+        if (request.prefix && request.identifier === 'saw_img_') {
+          return [ORPHAN_ID, 'existing0001'].map((id): QdnSearchHit => ({
+            service: 'DOCUMENT',
+            name: PUBLISHER,
+            identifier: `saw_img_${id}`,
+            created: 5,
+            updated: 5,
+            size: 128,
+            status: 'READY',
+            metadata: null,
+          }));
+        }
+        return base.search(request);
+      },
+      fetchText: (ref, options) => base.fetchText(ref, options),
+    };
+    const writer = writerFake();
+    const deps = makeDeps({ writer: writer.port, reader });
+    installNameBridge();
+
+    const result = await publishGalleryImage(
+      ownerContext(),
+      imageDraft({ id: FIXED_ID }),
+      {},
+      deps,
+    );
+
+    expect(result.status).toBe('published');
+    const partition = decodePayload(writer.calls[2].resources[0].data64);
+    const validated = validateCatalogPartition(partition, 'gallery-item', 'saw_cat_img_p000');
+    const ids = validated.ok ? validated.value.listings.map((listing) => listing.id) : [];
+    expect(ids).toContain('existing0001');
+    expect(ids).toContain(ORPHAN_ID);
+    expect(ids).toContain(FIXED_ID);
+  });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -874,6 +1022,48 @@ describe('published Gallery content is consumable by the existing read pipeline'
     expect(detail.status).toBe('ready');
     expect(detail.entity?.id).toBe(FIXED_ID);
     expect(detail.entity?.kind).toBe('gallery-item');
+  });
+
+  it('still lists a published item when the index write was skipped', async () => {
+    const writer = writerFake();
+    // The index cannot be read during the publish, so the derived index is
+    // skipped entirely — the observed owner failure.
+    const publishDeps = makeDeps({ writer: writer.port, reader: failingReader() });
+    installNameBridge();
+
+    const result = await publishGalleryImage(
+      ownerContext(),
+      imageDraft({ id: FIXED_ID }),
+      {},
+      publishDeps,
+    );
+    expect(result.status).toBe('index-incomplete');
+    expect(result.entityIdentifier).toBe(`saw_img_${FIXED_ID}`);
+
+    const entityText = atob(writer.calls[1].resources[0].data64);
+    const reader = createRecordingReader(
+      (request) => {
+        if (request.prefix && request.identifier === 'saw_img_') {
+          return [makeSearchHit('DOCUMENT', PUBLISHER, `saw_img_${FIXED_ID}`)];
+        }
+        return [];
+      },
+      (ref) => {
+        if (ref.identifier === `saw_img_${FIXED_ID}`) return entityText;
+        throw new Error('not found');
+      },
+    );
+
+    const snapshot = await loadArchive(resolvePublisherScope(HOSTED), {
+      reader,
+      cache: createContentCache(),
+      now: NOW,
+    });
+
+    // The authoritative entity is still listed even though it never reached the
+    // derived index, so the Gallery listing cannot silently hide it.
+    expect(snapshot.source).toBe('fallback');
+    expect(snapshot.listings.map((listing) => listing.id)).toContain(FIXED_ID);
   });
 });
 
