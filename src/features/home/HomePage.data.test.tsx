@@ -142,7 +142,7 @@ describe('published render runtime without a bridge', () => {
     renderApp({ route: '/', environment: PUBLISHED_RENDER_NO_BRIDGE, archiveLoader: loader });
 
     const posts = await screen.findByRole('region', { name: 'Latest Posts' });
-    expect(within(posts).getByRole('link', { name: 'Redaction notes' })).toBeInTheDocument();
+    expect(await within(posts).findByRole('link', { name: 'Redaction notes' })).toBeInTheDocument();
     expect(screen.queryByText(NO_PUBLISHER_CLAIM)).not.toBeInTheDocument();
     expect(screen.queryByText(/not running inside a Qortal runtime/i)).not.toBeInTheDocument();
   });
