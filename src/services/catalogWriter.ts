@@ -22,11 +22,13 @@ import { validateCatalogManifest, validateCatalogPartition } from '../domain/cat
 import { buildEntityIdentifier, isStableId } from '../domain/identifiers';
 import { normalizeTaxonomySlug } from '../domain/taxonomy';
 import type {
+  BlogPost,
   CatalogEntry,
   CatalogListing,
   CatalogManifest,
   GalleryAlbum,
   GalleryItem,
+  VideoEntry,
 } from '../domain/types';
 
 /** Partition token per kind, matching the read pipeline's `PARTITION_TOKEN_BY_KIND`. */
@@ -130,6 +132,61 @@ export function catalogEntryFromGalleryItem(
     width: item.data.width,
     height: item.data.height,
     albumId: item.data.albumId,
+  };
+}
+
+/** Catalog representation of a video entity (contract §5.2 / §7.2). */
+export function catalogEntryFromVideoEntry(
+  video: VideoEntry,
+  contentHash: string | null,
+): CatalogEntry {
+  return {
+    id: video.id,
+    service: 'DOCUMENT',
+    identifier: buildEntityIdentifier('video', video.id),
+    title: video.data.title,
+    slug: video.data.slug,
+    excerpt: video.data.description.slice(0, LIMITS.excerpt),
+    createdAt: video.createdAt,
+    updatedAt: video.updatedAt,
+    categories: boundedLabels(video.data.categories),
+    tags: boundedLabels(video.data.tags),
+    thumbnail: video.data.thumbnail,
+    state: video.state,
+    contentHash,
+    likeCount: null,
+    commentCount: null,
+    countsCompiledAt: null,
+    durationSeconds: video.data.durationSeconds,
+    width: null,
+    height: null,
+    albumId: null,
+  };
+}
+
+/** Catalog representation of a blog post (contract §5.1 / §7.2). */
+export function catalogEntryFromBlogPost(post: BlogPost, contentHash: string | null): CatalogEntry {
+  return {
+    id: post.id,
+    service: 'DOCUMENT',
+    identifier: buildEntityIdentifier('blog-post', post.id),
+    title: post.data.title,
+    slug: post.data.slug,
+    excerpt: post.data.excerpt.slice(0, LIMITS.excerpt),
+    createdAt: post.createdAt,
+    updatedAt: post.updatedAt,
+    categories: boundedLabels(post.data.categories),
+    tags: boundedLabels(post.data.tags),
+    thumbnail: post.data.thumbnail,
+    state: post.state,
+    contentHash,
+    likeCount: null,
+    commentCount: null,
+    countsCompiledAt: null,
+    durationSeconds: null,
+    width: null,
+    height: null,
+    albumId: null,
   };
 }
 

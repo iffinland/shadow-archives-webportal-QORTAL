@@ -615,6 +615,18 @@
   max-width: 900px;
 }
 
+/* ------------------------------------------------ video player (detail) -- */
+
+.sa-video-player {
+  display: block;
+  width: 100%;
+  max-width: 900px;
+  max-height: 70vh;
+  border: 1px solid var(--sa-color-border-strong);
+  border-radius: var(--sa-radius-sm);
+  background: var(--sa-color-surface-sunken);
+}
+
 .sa-taxonomy {
   display: flex;
   flex-wrap: wrap;

@@ -1,0 +1,111 @@
+/*
+ * Contact page (visitor private-chat form).
+ *
+ * Form primitives (`sa-form`, `sa-field*`, `sa-input*`, `sa-outcome*`) are shared
+ * with the owner publishing flows and are intentionally NOT redefined here; this
+ * file only adds the Contact page's own layout.
+ */
+
+.sa-contact {
+  gap: var(--sa-space-4);
+}
+
+.sa-contact__transport,
+.sa-contact__recipient {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sa-space-2);
+  padding: var(--sa-space-4);
+  background: var(--sa-color-surface-sunken);
+  border: 1px solid var(--sa-color-border);
+  border-radius: var(--sa-radius-md);
+}
+
+.sa-contact__transport-title,
+.sa-contact__recipient-title {
+  margin: 0;
+  font-size: var(--sa-text-lg);
+}
+
+.sa-contact__transport-body,
+.sa-contact__recipient-body,
+.sa-contact__sender {
+  margin: 0;
+  max-width: 72ch;
+  color: var(--sa-color-text-muted);
+}
+
+.sa-contact__recipient-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sa-space-2);
+}
+
+.sa-contact__recipient-body--blocked {
+  color: var(--sa-color-warning);
+}
+
+.sa-contact__sender {
+  font-size: var(--sa-text-sm);
+}
+
+.sa-contact__form {
+  max-width: 72ch;
+}
+
+.sa-contact__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sa-space-3);
+  align-items: center;
+}
+
+.sa-contact__blocked-note {
+  margin: 0;
+  color: var(--sa-color-text-muted);
+  font-size: var(--sa-text-sm);
+}
+
+.sa-contact__outcome {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sa-space-3);
+  outline: none;
+}
+
+.sa-contact__outcome:focus-visible {
+  outline: 2px solid var(--sa-color-accent);
+  outline-offset: 2px;
+}
+
+.sa-contact__pending {
+  margin: 0;
+  color: var(--sa-color-text-muted);
+}
+
+.sa-contact__details {
+  font-size: var(--sa-text-sm);
+}
+
+.sa-contact__details summary {
+  cursor: pointer;
+  color: var(--sa-color-text-muted);
+}
+
+.sa-contact__details dl {
+  display: grid;
+  gap: var(--sa-space-2);
+  margin: var(--sa-space-2) 0 0;
+}
+
+.sa-contact__details dt {
+  color: var(--sa-color-text-muted);
+  font-size: var(--sa-text-xs);
+}
+
+.sa-contact__details dd {
+  margin: 0;
+  font-family: var(--sa-font-mono);
+  font-size: var(--sa-text-xs);
+  overflow-wrap: anywhere;
+}

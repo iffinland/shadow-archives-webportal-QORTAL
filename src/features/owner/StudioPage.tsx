@@ -239,17 +239,20 @@ export default function StudioPage() {
               ]}
             />
             <p className="sa-studio__body">
-              Owner mode is active for this session. Gallery publishing is available: the Gallery
-              page now shows owner controls (Add image, Create album) and Studio appears in the main
+              Owner mode is active for this session. Gallery and video publishing are available: the
+              Gallery and Videos pages now show owner controls, and Studio appears in the main
               navigation only while this capability is verified.
             </p>
             <p className="sa-studio__body">
-              Blog and video publishing, editing, moderation and comments are roadmap items and are
-              not interactive in this build.
+              Blog publishing, editing, moderation and comments are roadmap items and are not
+              interactive in this build.
             </p>
             <div className="sa-route__actions">
               <Link className="sa-button sa-button--primary sa-button--md" to={routes.gallery}>
                 Manage Gallery
+              </Link>
+              <Link className="sa-button sa-button--secondary sa-button--md" to={routes.videos}>
+                Manage Videos
               </Link>
               <Button variant="secondary" onClick={retryOwnerMode}>
                 Re-check ownership

@@ -160,3 +160,42 @@ export function parseGalleryMediaIdentifier(
   }
   return null;
 }
+
+/** Poster identifier family for a video id (`saw_vid_thumb_<id12>`). */
+export function buildVideoThumbnailIdentifier(id: string): string {
+  return `saw_vid_thumb_${id}`;
+}
+
+/**
+ * Recover the video id from a poster identifier, when it matches the shape.
+ *
+ * The interoperable `VIDEO` media resource of a Shadow Archives publication is
+ * NOT in this family: it lives at the Q-Tube video base identifier for the same
+ * id (see `services/qtubeVideoContract.ts`) so the ecosystem convention that the
+ * media identifier equals the metadata identifier minus `_metadata` holds.
+ */
+export function parseVideoThumbnailIdentifier(
+  identifier: unknown,
+): { readonly kind: 'thumbnail'; readonly id: string } | null {
+  if (typeof identifier !== 'string') return null;
+  const prefix = 'saw_vid_thumb_';
+  if (!identifier.startsWith(prefix)) return null;
+  const id = identifier.slice(prefix.length);
+  return isStableId(id) ? { kind: 'thumbnail', id } : null;
+}
+
+/** Thumbnail/cover identifier family for a blog post id (`saw_post_thumb_<id12>`). */
+export function buildBlogThumbnailIdentifier(id: string): string {
+  return `saw_post_thumb_${id}`;
+}
+
+/** Recover the blog post id from a cover identifier, when it matches the shape. */
+export function parseBlogThumbnailIdentifier(
+  identifier: unknown,
+): { readonly kind: 'thumbnail'; readonly id: string } | null {
+  if (typeof identifier !== 'string') return null;
+  const prefix = 'saw_post_thumb_';
+  if (!identifier.startsWith(prefix)) return null;
+  const id = identifier.slice(prefix.length);
+  return isStableId(id) ? { kind: 'thumbnail', id } : null;
+}

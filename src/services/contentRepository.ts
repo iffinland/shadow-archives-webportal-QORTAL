@@ -1,4 +1,8 @@
-import { listingFromGalleryItem } from '../domain/catalog';
+import {
+  listingFromBlogPost,
+  listingFromGalleryItem,
+  listingFromVideoEntry,
+} from '../domain/catalog';
 import { CACHE_TTL_MS, LIMITS, type EntityKind } from '../domain/constants';
 import { validateEntityPayload } from '../domain/entities';
 import { buildEntityIdentifier, resolveEntityReference } from '../domain/identifiers';
@@ -131,38 +135,57 @@ export interface ListingMediaHydration {
  * its card renders as a placeholder and the album page cannot resolve it. The
  * entity resource stays authoritative and is tiny (bounded by `LIMITS.entityBytes`),
  * so a bounded number of those listings is hydrated from the entity itself. Only
- * gallery items are hydrated here, and the full-size `IMAGE`/`VIDEO` media is
- * still never downloaded for a listing.
+ * gallery items and videos are hydrated here, and the full-size `IMAGE`/`VIDEO`
+ * media is still never downloaded for a listing.
  *
  * Best effort by contract: a hydration failure keeps the discovery listing
  * (which still proves the entity exists) and is reported, never fatal.
  */
+/** Entity kinds whose listing card is rendered from the authoritative entity. */
+type HydratableKind = 'gallery-item' | 'video';
+
+const HYDRATABLE_KINDS: readonly EntityKind[] = ['gallery-item', 'video'];
+
+/**
+ * True when a discovery-only listing lacks the display data its card needs.
+ * Other kinds and catalog-backed listings are left alone: the index already
+ * carries their listing fields, and a card never needs the entity body.
+ */
+function needsListingHydration(listing: CatalogListing): boolean {
+  if (listing.partitionIdentifier !== 'fallback') return false;
+  if (!HYDRATABLE_KINDS.includes(listing.type)) return false;
+  if (listing.type === 'video') {
+    return listing.thumbnail === null || listing.durationSeconds === null;
+  }
+  return listing.thumbnail === null;
+}
+
+/** Rebuild one listing from a hydrated, already-validated entity. */
+function listingFromHydratedEntity(entity: ShadowArchiveEntity | null): CatalogListing | null {
+  if (!entity) return null;
+  if (entity.kind === 'gallery-item') return listingFromGalleryItem(entity);
+  if (entity.kind === 'video') return listingFromVideoEntry(entity);
+  if (entity.kind === 'blog-post') return listingFromBlogPost(entity);
+  return null;
+}
+
 async function hydrateListingMedia(
   reader: QdnReadPort,
   publisherName: string,
   listings: readonly CatalogListing[],
   options: { readonly cache: ContentCache; readonly now: number },
 ): Promise<ListingMediaHydration> {
-  const pending = listings
-    .filter(
-      (listing) =>
-        listing.type === 'gallery-item' &&
-        listing.thumbnail === null &&
-        listing.partitionIdentifier === 'fallback',
-    )
-    .slice(0, LIMITS.listingHydrationMax);
+  const pending = listings.filter(needsListingHydration).slice(0, LIMITS.listingHydrationMax);
   if (pending.length === 0) return { listings: [...listings], hydrated: 0, failed: 0 };
 
   const scope: PublisherScope = { scoped: true, name: publisherName, service: 'DOCUMENT' };
   const results = await runBounded(pending, LIMITS.entityConcurrency, async (listing) => {
-    const detail = await loadEntityDetail(scope, 'gallery-item', listing.id, {
+    const detail = await loadEntityDetail(scope, listing.type as HydratableKind, listing.id, {
       reader,
       cache: options.cache,
       now: options.now,
     });
-    const entity = detail.entity;
-    if (!entity || entity.kind !== 'gallery-item') return null;
-    return listingFromGalleryItem(entity);
+    return listingFromHydratedEntity(detail.entity);
   });
 
   const hydratedByIdentifier = new Map<string, CatalogListing>();

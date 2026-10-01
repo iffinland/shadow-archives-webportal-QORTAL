@@ -25,7 +25,6 @@ import {
   type RandomBytes,
 } from '../domain/identifiers';
 import type { CatalogListing, GalleryAlbum, GalleryItem, QdnMediaReference } from '../domain/types';
-import { getNameData } from '../qortal/auth';
 import { QortalBridgeError } from '../qortal/bridge';
 import {
   bridgePublishPort,
@@ -34,18 +33,22 @@ import {
   type PublishPort,
   type PublishSubmission,
 } from '../qortal/publish';
-import type { CapabilityState, QdnEnvironment, QortalAccount } from '../qortal/types';
 import { blobToBase64, utf8ToBase64 } from './base64';
 import { getContentCache, type ContentCache } from './cache';
 import {
-  assertCatalogPlanValid,
   catalogEntryFromGalleryAlbum,
   catalogEntryFromGalleryItem,
-  planCatalogWrite,
   type CatalogChecksumFn,
-  type CatalogWritePlan,
 } from './catalogWriter';
-import { invalidateCatalogCache, loadCatalog, type CatalogLoadResult } from './catalogRepository';
+import {
+  catalogIdIsTaken,
+  planCatalogEntry,
+  readCatalogContext,
+  safeContentHashOf,
+  type CatalogWriteContext,
+  type ExistingCatalog,
+} from './catalogPublishSupport';
+import { invalidateCatalogCache } from './catalogRepository';
 import { invalidateEntityCache, loadEntityDetail } from './contentRepository';
 import { discoverArchive } from './fallbackDiscovery';
 import type { PublisherScope } from './publisher';
@@ -57,19 +60,15 @@ import {
   type GalleryImageProcessingResult,
   type ImageProcessingDeps,
 } from './imageProcessing';
-import { isOwnerCapableRuntime } from '../qortal/capability';
+import { authorityFailure, authorityFreshFailure, type OwnerWriteContext } from './ownerAuthority';
 import { bridgeQdnReadPort, parseJsonPayload, type QdnReadPort } from './qdnReader';
+
+/** Re-exported so Gallery callers keep importing the context type from here. */
+export type { OwnerWriteContext } from './ownerAuthority';
 
 /* -------------------------------------------------------------------------- */
 /* Input, context and result types                                            */
 /* -------------------------------------------------------------------------- */
-
-/** Owner/authority context supplied by the React layer from the real providers. */
-export interface OwnerWriteContext {
-  readonly capability: CapabilityState;
-  readonly account: QortalAccount | null;
-  readonly environment: QdnEnvironment;
-}
 
 export interface GalleryImageDraft {
   readonly file: File;
@@ -195,33 +194,8 @@ export interface PublishGalleryImageOptions {
 /* -------------------------------------------------------------------------- */
 
 function authorityCheck(ctx: OwnerWriteContext, publisherName: string): void {
-  // Writes are gated on the fully capable runtime state only (`qortal-host`:
-  // injected identity + reachable bridge, never the dev proxy). The read-only
-  // same-origin fallback is deliberately NOT sufficient for a write.
-  if (!isOwnerCapableRuntime(ctx.environment)) {
-    throw new GalleryPublishError(
-      'not-hosted',
-      'Gallery publishing requires the app to run inside a real Qortal host with an account bridge.',
-    );
-  }
-  if (ctx.capability !== 'owner') {
-    throw new GalleryPublishError(
-      'not-owner',
-      'Gallery publishing requires a positively verified owner capability.',
-    );
-  }
-  if (!ctx.account) {
-    throw new GalleryPublishError(
-      'authority-unresolved',
-      'No connected Qortal account is available.',
-    );
-  }
-  if (!publisherName || ctx.environment.publisherName !== publisherName) {
-    throw new GalleryPublishError(
-      'authority-unresolved',
-      'The publishing name could not be derived from the app identity.',
-    );
-  }
+  const failure = authorityFailure(ctx, publisherName, 'Gallery');
+  if (failure) throw new GalleryPublishError(failure.code, failure.message);
 }
 
 /**
@@ -229,33 +203,8 @@ function authorityCheck(ctx: OwnerWriteContext, publisherName: string): void {
  * between the initial capability check and the write must block the write.
  */
 async function assertAuthorityFresh(ctx: OwnerWriteContext, publisherName: string): Promise<void> {
-  authorityCheck(ctx, publisherName);
-  const account = ctx.account;
-  if (!account) {
-    throw new GalleryPublishError(
-      'authority-unresolved',
-      'No connected Qortal account is available.',
-    );
-  }
-  let owner: string | null;
-  try {
-    const data = await getNameData(publisherName);
-    owner = data?.owner ?? null;
-  } catch {
-    owner = null;
-  }
-  if (!owner) {
-    throw new GalleryPublishError(
-      'authority-unresolved',
-      'Current ownership of the publishing name could not be re-established.',
-    );
-  }
-  if (owner !== account.address) {
-    throw new GalleryPublishError(
-      'authority-changed',
-      'The connected account no longer owns the publishing name, so nothing was published.',
-    );
-  }
+  const failure = await authorityFreshFailure(ctx, publisherName, 'Gallery');
+  if (failure) throw new GalleryPublishError(failure.code, failure.message);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -326,52 +275,7 @@ function mediaRef(
 /* Preparation                                                                */
 /* -------------------------------------------------------------------------- */
 
-interface CatalogContext {
-  /** `null` when the index cannot be safely updated (see `catalogSkipReason`). */
-  readonly plan: CatalogWritePlan | null;
-  readonly skipReason: string | null;
-}
-
-interface CatalogContextBase {
-  readonly existing: {
-    readonly manifest: import('../domain/types').CatalogManifest | null;
-    readonly listings: readonly import('../domain/types').CatalogListing[];
-  };
-  /** Non-null when the derived index must NOT be rewritten this time. */
-  readonly skipReason: string | null;
-}
-
-/** Bounded retries when the index data is not yet available on the read node. */
-const CATALOG_READ_MAX_ATTEMPTS = 3;
-const CATALOG_READ_RETRY_MS = 600;
-
-/** Bound on entity payload fetches while repairing the derived index. */
 const CATALOG_REPAIR_FETCH_LIMIT = 25;
-
-function defaultDelay(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Read the derived index, retrying a transient read failure a bounded number of
- * times. Data availability on a Qortal node lags the search index: a resource
- * can be discoverable while its bytes are still `MISSING_DATA`/`DOWNLOADING`.
- * Without a retry, that transient state was treated as a permanently unreadable
- * index and the newly published entity was never added to the catalog.
- */
-async function loadCatalogForPublish(
-  deps: GalleryPublishDeps,
-  publisherName: string,
-): Promise<CatalogLoadResult> {
-  const attempt = (): Promise<CatalogLoadResult> =>
-    loadCatalog(deps.reader, deps.cache, publisherName, { now: deps.now(), force: true });
-  let result = await attempt();
-  for (let round = 1; round < CATALOG_READ_MAX_ATTEMPTS && result.kind === 'error'; round += 1) {
-    await (deps.delay ?? defaultDelay)(CATALOG_READ_RETRY_MS);
-    result = await attempt();
-  }
-  return result;
-}
 
 const RECONCILABLE_KINDS = ['gallery-item', 'gallery-album'] as const;
 
@@ -395,8 +299,8 @@ async function repairExistingListings(
   deps: GalleryPublishDeps,
   publisherName: string,
   type: EntityKind,
-  existing: CatalogContextBase['existing'],
-): Promise<CatalogContextBase['existing']> {
+  existing: ExistingCatalog,
+): Promise<ExistingCatalog> {
   if (!isReconcilableKind(type)) return existing;
   const known = new Set(existing.listings.map((listing) => listing.identifier));
 
@@ -442,99 +346,6 @@ async function repairExistingListings(
   }
   if (restored.length === 0) return existing;
   return { manifest: existing.manifest, listings: [...existing.listings, ...restored] };
-}
-
-/**
- * Read the current derived index before any write.
- *
- * A genuinely missing catalog is bootstrapped and a readable catalog is repaired
- * in place. A catalog that is invalid, unreadable or only partially readable is
- * still left untouched, because republishing it from a partial view could drop
- * entries; the authoritative content is still published and the read path
- * reconciles it with bounded discovery.
- */
-async function readCatalogContext(
-  deps: GalleryPublishDeps,
-  publisherName: string,
-  type: EntityKind,
-): Promise<CatalogContextBase> {
-  const catalog = await loadCatalogForPublish(deps, publisherName);
-
-  if (catalog.kind === 'error') {
-    return {
-      existing: { manifest: null, listings: [] },
-      skipReason:
-        'The Gallery index could not be read, so it was left untouched. The content itself is published and discoverable by the fallback scan.',
-    };
-  }
-  if (catalog.kind === 'invalid') {
-    return {
-      existing: { manifest: null, listings: [] },
-      skipReason:
-        'The Gallery index is invalid or uses an unsupported version, so it was left untouched to avoid overwriting it.',
-    };
-  }
-  if (catalog.kind === 'loaded' && (catalog.partial || catalog.rejectedEntries > 0)) {
-    return {
-      existing: { manifest: null, listings: [] },
-      skipReason:
-        'The Gallery index could not be read completely, so it was left untouched to avoid dropping existing entries.',
-    };
-  }
-  const base =
-    catalog.kind === 'loaded'
-      ? { manifest: catalog.manifest, listings: catalog.listings }
-      : { manifest: null, listings: [] };
-  const repaired = await repairExistingListings(deps, publisherName, type, base);
-  return { existing: repaired, skipReason: null };
-}
-
-async function planCatalogFromContext(
-  deps: GalleryPublishDeps,
-  publisherName: string,
-  type: EntityKind,
-  entry: Parameters<typeof planCatalogWrite>[0]['entry'],
-  base: CatalogContextBase,
-): Promise<CatalogContext> {
-  if (base.skipReason) return { plan: null, skipReason: base.skipReason };
-  try {
-    const plan = await planCatalogWrite({
-      type,
-      entry,
-      publisherName,
-      compiledAt: deps.now(),
-      existing: base.existing,
-      checksumFn: deps.checksumFn,
-    });
-    assertCatalogPlanValid(plan);
-    return { plan, skipReason: null };
-  } catch (error) {
-    // The catalog is derived and the entity is authoritative: a planning or
-    // validation failure must never block the content write. Skip the index and
-    // report it truthfully instead.
-    const detail = error instanceof Error ? error.message : 'unknown error';
-    return {
-      plan: null,
-      skipReason: `The Gallery index could not be prepared for this publication (${detail}), so it was left untouched.`,
-    };
-  }
-}
-
-async function idIsTaken(
-  deps: GalleryPublishDeps,
-  publisherName: string,
-  kind: EntityKind,
-  id: string,
-  knownIds: ReadonlySet<string>,
-): Promise<boolean> {
-  if (knownIds.has(id)) return true;
-  const identifier = buildEntityIdentifier(kind, id);
-  const lookup = await findExactResource(deps.reader, {
-    service: 'DOCUMENT',
-    name: publisherName,
-    identifier,
-  });
-  return lookup.kind === 'found';
 }
 
 /* -------------------------------------------------------------------------- */
@@ -696,7 +507,7 @@ async function invalidateAfterPublish(
   deps: GalleryPublishDeps,
   publisherName: string,
   entityIdentifier: string,
-  catalog: CatalogContext,
+  catalog: CatalogWriteContext,
 ): Promise<void> {
   try {
     await invalidateEntityCache(deps.cache, publisherName, [entityIdentifier]);
@@ -735,7 +546,9 @@ export async function publishGalleryImage(
   // Read the derived index before any write so an unreadable catalog is detected
   // up front (it must not block the authoritative content write) and the progress
   // counter can describe the concrete plan truthfully.
-  const catalogBase = await readCatalogContext(deps, publisherName, 'gallery-item');
+  const catalogBase = await readCatalogContext(deps, publisherName, 'Gallery', (base) =>
+    repairExistingListings(deps, publisherName, 'gallery-item', base),
+  );
   const emit = createProgressEmitter(options.onProgress, catalogBase.skipReason ? 8 : 11);
   emit('preparing-media', 'Preparing image and thumbnail');
   let processed: GalleryImageProcessingResult;
@@ -751,7 +564,7 @@ export async function publishGalleryImage(
 
   const now = deps.now();
   const taken = async (id: string): Promise<boolean> =>
-    idIsTaken(deps, publisherName, 'gallery-item', id, new Set<string>());
+    catalogIdIsTaken(deps, publisherName, 'gallery-item', id, new Set<string>());
   let id: string;
   if (draft.id) {
     id = draft.id;
@@ -811,9 +624,10 @@ export async function publishGalleryImage(
   // Plan the derived index before any write so an unreadable catalog cannot
   // block the authoritative content write.
   const contentHash = await safeContentHash(deps, data);
-  const catalog = await planCatalogFromContext(
+  const catalog = await planCatalogEntry(
     deps,
     publisherName,
+    'Gallery',
     'gallery-item',
     catalogEntryFromGalleryItem(entity, contentHash),
     catalogBase,
@@ -1044,12 +858,14 @@ export async function publishGalleryAlbum(
 
   authorityCheck(ctx, publisherName);
 
-  const catalogBase = await readCatalogContext(deps, publisherName, 'gallery-album');
+  const catalogBase = await readCatalogContext(deps, publisherName, 'Gallery', (base) =>
+    repairExistingListings(deps, publisherName, 'gallery-album', base),
+  );
   const emit = createProgressEmitter(options.onProgress, catalogBase.skipReason ? 4 : 7);
 
   const now = deps.now();
   const taken = async (id: string): Promise<boolean> =>
-    idIsTaken(deps, publisherName, 'gallery-album', id, new Set<string>());
+    catalogIdIsTaken(deps, publisherName, 'gallery-album', id, new Set<string>());
   let id: string;
   if (draft.id) {
     id = draft.id;
@@ -1090,9 +906,10 @@ export async function publishGalleryAlbum(
   const album = validated.value as GalleryAlbum;
 
   const contentHash = await safeContentHash(deps, album.data);
-  const catalog = await planCatalogFromContext(
+  const catalog = await planCatalogEntry(
     deps,
     publisherName,
+    'Gallery',
     'gallery-album',
     catalogEntryFromGalleryAlbum(album, contentHash),
     catalogBase,
@@ -1235,26 +1052,7 @@ export async function publishGalleryAlbum(
  * hash/checksum failure must never abort an authoritative content publication.
  */
 async function safeContentHash(deps: GalleryPublishDeps, value: unknown): Promise<string | null> {
-  try {
-    return deps.checksumFn ? await deps.checksumFn(value) : await defaultContentHash(value);
-  } catch {
-    return null;
-  }
-}
-
-async function defaultContentHash(value: unknown): Promise<string | null> {
-  try {
-    const subtle = globalThis.crypto?.subtle;
-    if (!subtle) return null;
-    const bytes = new TextEncoder().encode(JSON.stringify(value));
-    const digest = await subtle.digest('SHA-256', bytes);
-    const hex = Array.from(new Uint8Array(digest))
-      .map((byte) => byte.toString(16).padStart(2, '0'))
-      .join('');
-    return `sha256:${hex}`;
-  } catch {
-    return null;
-  }
+  return safeContentHashOf(value, deps.checksumFn);
 }
 
 function extensionForMime(mimeType: string): string {

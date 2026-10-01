@@ -6,7 +6,7 @@ import { useQortalEnvironment } from '../../../app/providers/BridgeProvider';
 import type { GalleryPublishDeps } from '../../../services/galleryPublishService';
 import { GalleryAlbumModal } from './GalleryAlbumModal';
 import { GalleryImageModal } from './GalleryImageModal';
-import './owner.css';
+import '../../owner/owner.css';
 
 /**
  * Owner-only Gallery controls.

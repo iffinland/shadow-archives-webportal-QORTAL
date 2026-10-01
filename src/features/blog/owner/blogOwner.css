@@ -1,0 +1,102 @@
+/* Owner blog editor — scoped to the lazy owner boundary only. */
+
+.sa-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  border: 1px solid var(--sa-border, rgba(120, 96, 60, 0.35));
+  border-radius: 6px;
+  padding: 0.5rem;
+  background: var(--sa-surface, rgba(255, 252, 244, 0.6));
+}
+
+.sa-editor__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.sa-editor__button {
+  min-width: 2rem;
+  padding: 0.25rem 0.4rem;
+  font-size: 0.85rem;
+  line-height: 1.1;
+  border: 1px solid var(--sa-border, rgba(120, 96, 60, 0.35));
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.sa-editor__button:hover:not(:disabled) {
+  background: rgba(120, 96, 60, 0.12);
+}
+
+.sa-editor__button--active {
+  background: rgba(120, 96, 60, 0.22);
+  font-weight: 600;
+}
+
+.sa-editor__button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sa-editor__link {
+  display: inline-flex;
+  gap: 0.25rem;
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.sa-editor__surface {
+  min-height: 16rem;
+  max-height: 32rem;
+  overflow-y: auto;
+  padding: 0.5rem 0.6rem;
+  outline: none;
+}
+
+.sa-editor__surface:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+.sa-editor__surface h2,
+.sa-editor__surface h3 {
+  margin: 0.6em 0 0.3em;
+}
+
+.sa-editor__surface blockquote {
+  margin: 0.5em 0;
+  padding-inline-start: 0.75em;
+  border-inline-start: 3px solid rgba(120, 96, 60, 0.4);
+}
+
+.sa-editor__surface pre {
+  padding: 0.5em;
+  overflow-x: auto;
+  background: rgba(120, 96, 60, 0.1);
+  border-radius: 4px;
+}
+
+.sa-editor__surface a {
+  text-decoration: underline;
+}
+
+.sa-quitter-step {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sa-border, rgba(120, 96, 60, 0.35));
+}
+
+.sa-field--inline {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.sa-field--inline .sa-field__hint {
+  display: block;
+}
