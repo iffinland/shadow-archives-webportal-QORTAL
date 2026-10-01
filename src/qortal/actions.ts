@@ -59,11 +59,15 @@ export type QortalActionName = (typeof QortalAction)[keyof typeof QortalAction];
  * `SEND_CHAT_MESSAGE` relays an encrypted direct CHAT transaction. CHAT is
  * never block-confirmed, so a successful result means "accepted and relayed",
  * not "delivered"; see `qortal/chat.ts` for the result taxonomy.
+ * `SEND_COIN` is a Hub-approved payment. A returned signature is a submitted
+ * transaction, not a block-confirmed transfer, and an ambiguous result is
+ * never retried automatically.
  */
 export const WRITE_ACTIONS = {
   PUBLISH_QDN_RESOURCE: 'PUBLISH_QDN_RESOURCE',
   PUBLISH_MULTIPLE_QDN_RESOURCES: 'PUBLISH_MULTIPLE_QDN_RESOURCES',
   SEND_CHAT_MESSAGE: 'SEND_CHAT_MESSAGE',
+  SEND_COIN: 'SEND_COIN',
 } as const;
 
 export type QortalWriteActionName = (typeof WRITE_ACTIONS)[keyof typeof WRITE_ACTIONS];

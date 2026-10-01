@@ -1,14 +1,8 @@
 import { Link } from 'react-router-dom';
 
-import {
-  IconComment,
-  IconImage,
-  IconShare,
-  IconThumbsUp,
-  IconTip,
-  MediaFrame,
-} from '../../../components/common';
+import { IconImage, MediaFrame } from '../../../components/common';
 import type { ContentCardModel } from '../../../types/content';
+import { CardEngagementControls } from './CardEngagementControls';
 
 interface ContentCardProps {
   readonly item: ContentCardModel;
@@ -16,11 +10,8 @@ interface ContentCardProps {
 
 /**
  * Content card geometry: thumbnail, title, short description and an engagement
- * footer row.
- *
- * Phase 1B reserves the footer geometry but exposes no engagement controls —
- * the row is `aria-hidden` because it contains no working interaction yet, and
- * no like/comment counts are fabricated.
+ * footer row. Engagement controls use the item's exact QDN entity identifier;
+ * their feedback is rendered beside the card action that initiated it.
  */
 export function ContentCard({ item }: ContentCardProps) {
   return (
@@ -51,20 +42,7 @@ export function ContentCard({ item }: ContentCardProps) {
         {item.description ? <p className="sa-card__description">{item.description}</p> : null}
       </div>
 
-      <div className="sa-card__actions" aria-hidden="true">
-        <span className="sa-card__action">
-          <IconThumbsUp />
-        </span>
-        <span className="sa-card__action">
-          <IconComment />
-        </span>
-        <span className="sa-card__action">
-          <IconShare />
-        </span>
-        <span className="sa-card__action">
-          <IconTip />
-        </span>
-      </div>
+      <CardEngagementControls item={item} />
     </article>
   );
 }

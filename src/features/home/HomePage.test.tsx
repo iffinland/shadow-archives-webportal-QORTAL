@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { render, screen } from '@testing-library/react';
 
+import { AuthProvider } from '../../app/providers/AuthProvider';
+import { BridgeProvider } from '../../app/providers/BridgeProvider';
 import { renderApp } from '../../test/utils';
 import { makeEnvironment } from '../../test/environment';
 import { LatestPostsSection } from './components/LatestPostsSection';
@@ -30,23 +32,27 @@ describe('HomePage', () => {
 
   it('renders card geometry when content is supplied (future catalog shape)', () => {
     render(
-      <MemoryRouter>
-        <LatestPostsSection
-          state={{
-            status: 'ready',
-            items: [
-              {
-                id: 'saw_post_abc',
-                kind: 'post',
-                title: 'Redaction notes',
-                description: 'A short description.',
-                href: '/blog/saw_post_abc',
-                media: { src: '/thumb.webp', alt: 'Cover', width: 16, height: 9 },
-              },
-            ],
-          }}
-        />
-      </MemoryRouter>,
+      <BridgeProvider environment={makeEnvironment()}>
+        <AuthProvider>
+          <MemoryRouter>
+            <LatestPostsSection
+              state={{
+                status: 'ready',
+                items: [
+                  {
+                    id: 'saw_post_abc',
+                    kind: 'post',
+                    title: 'Redaction notes',
+                    description: 'A short description.',
+                    href: '/blog/saw_post_abc',
+                    media: { src: '/thumb.webp', alt: 'Cover', width: 16, height: 9 },
+                  },
+                ],
+              }}
+            />
+          </MemoryRouter>
+        </AuthProvider>
+      </BridgeProvider>,
     );
 
     expect(screen.getByRole('heading', { name: 'Redaction notes' })).toBeInTheDocument();
@@ -57,9 +63,13 @@ describe('HomePage', () => {
     expect(screen.getByText('A short description.')).toBeInTheDocument();
     expect(screen.getByAltText('Cover')).toBeInTheDocument();
     expect(screen.getByAltText('Cover')).toHaveAttribute('loading', 'lazy');
-    // Engagement footer geometry exists but is inert in this phase.
+    // Every card exposes the same real engagement controls.
     const actions = document.querySelector('.sa-card__actions');
     expect(actions).not.toBeNull();
-    expect(actions).toHaveAttribute('aria-hidden', 'true');
+    expect(actions).toHaveAttribute('aria-label', 'Actions for Redaction notes');
+    expect(screen.getByRole('button', { name: 'Like' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Comment' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tip' })).toBeInTheDocument();
   });
 });
