@@ -3,9 +3,14 @@
 Shadow Archives is a Qortal Q-App (`APP` service) for publishing and reading an
 archive of blog posts, videos and gallery media stored on QDN.
 
-**Current status: Phase 1B — application foundation and responsive AppShell.**
-There is no content discovery, publishing, engagement, search or Q-Mail in this
-build, and nothing is loaded from QDN yet. See "Phase boundaries" below.
+**Current status: implemented QDN archive and owner publishing workflows.**
+The app discovers and reads Blog, Video and Gallery content from QDN. An
+authenticated owner of the rendered QDN name can publish Blog, Video and
+Gallery content through the Qortal host bridge. Blog publication can produce a
+SubWire-compatible article and an optional Quitter announcement; Video
+publication follows the documented Q-Tube convention; Contact sends a direct
+Qortal private-chat message. See "Phase boundaries" and the dated runtime
+evidence below for the limits of those claims.
 
 ## Requirements
 
@@ -32,8 +37,9 @@ Vite 7, React 19, TypeScript 5.9 (strict), `react-router-dom` 7
 SVG icons.
 
 Deliberately **not** used: `HashRouter`, MUI/emotion, `qapp-core`'s published
-root entry, any video player library, TipTap and DOMPurify (all deferred to the
-feature phases that need them).
+root entry or a third-party video-player library. Rich-text editing and
+sanitisation use the in-repository, contract-specific implementation rather
+than expanding the runtime dependency surface.
 
 ## Layout
 
@@ -81,12 +87,11 @@ authenticated-non-owner | owner`; it never reports `owner` optimistically.
 Implemented: routing, design tokens, responsive shell (header top panels, banner,
 primary action row, site navigation, footer), loading/empty/error states,
 route-level code splitting, accessibility primitives (skip link, focus-visible
-ring, reduced-motion handling, 44/48px targets) and a read-only integration
-boundary.
+ring, reduced-motion handling, 44/48px targets), QDN discovery/read paths,
+owner-gated Blog/Video/Gallery publishing, and direct private-chat Contact.
 
-Not implemented (by design): comments, likes, tips, Q-Mail sending, moderation,
-deep search and a QDN discovery crawler. Owner publishing for Blog, Video and
-Gallery is implemented (see below). No fake engagement data is shown.
+Not implemented (by design): comments, likes, tips, moderation, deep search and
+a general QDN discovery crawler. No fake engagement data is shown.
 
 The owner-approved "publishing interoperability first" rule requires inspecting
 the then-current Q-Tube/Subwire sources and QDN contracts before a publish modal
@@ -209,11 +214,23 @@ automatically.
 
 ## Validation
 
-`npm run lint`, `npm run typecheck`, `npm test` and `npm run build` pass. A
-headless-Chrome smoke test against the production build verified rendering from
-320px to 2560px without horizontal overflow, ≥44px interactive targets, visible
-focus, working keyboard search disclosure and zero external network requests.
+The documented checks are regression support, not a replacement for host proof.
+The owner-runtime checkpoint on 2026-09-13 verified Gallery, Video, Blog,
+optional Quitter and Contact workflows on a real Qortal host. The focused
+2026-10-01 remediation additionally proved that the app reports resolved
+partial/all-failed grouped QDN publication outcomes truthfully before the owner
+successfully created a new Blog post. See the canonical Qortal workspace
+handoffs and audits for exact revisions, signatures and the boundaries of each
+runtime check.
 
-Real Qortal host / node dev-proxy behaviour has **not** been verified: no local
-Qortal node was available for this work. A real host remains the authoritative
-gate for runtime behaviour.
+Before a new release, rebuild with `npm run build`, publish the resulting
+`dist/` through the owner's normal Qortal Hub flow, and verify the bytes served
+by QDN against that build. Do not infer deployment from a local build or a Git
+commit alone.
+
+## Licence and attribution
+
+Shadow Archives Webportal is licensed under the GNU General Public License,
+version 3 or later. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). When using
+or adapting the project, retain its copyright and licence notices. If practical,
+please also contact the original project through the repository's issue tracker.
