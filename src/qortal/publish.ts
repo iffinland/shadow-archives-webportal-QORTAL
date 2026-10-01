@@ -193,6 +193,36 @@ function failureFor(resource: PublishResourceInput, error: QortalBridgeError): P
   };
 }
 
+/**
+ * Hub can resolve a grouped publish with `error.unsuccessfulPublishes` instead
+ * of rejecting it. Normalize that response before treating any result as a
+ * submission, so an owner never sees a partial write reported as success.
+ */
+function resultFromFailures(
+  resources: readonly PublishResourceInput[],
+  failures: readonly PublishFailure[],
+  error: QortalBridgeError,
+): PublishAttempt {
+  if (failures.length >= resources.length) return { kind: 'failed', error, failures };
+
+  const failedIdentifiers = new Set(
+    failures.map((failure) => `${failure.service}|${failure.identifier ?? ''}`),
+  );
+  const submissions = resources
+    .filter(
+      (resource) => !failedIdentifiers.has(`${resource.service}|${resource.identifier ?? ''}`),
+    )
+    .map<PublishSubmission>((resource) => ({
+      service: resource.service,
+      identifier: resource.identifier ?? null,
+      name: resource.name,
+      // Hub's resolved partial response has no per-resource signatures.
+      signature: null,
+      raw: null,
+    }));
+  return { kind: 'partial', submissions, failures };
+}
+
 async function publishCall(
   action: QortalWriteActionName,
   buildParams: (payloads: readonly Record<string, unknown>[]) => Record<string, unknown>,
@@ -204,6 +234,14 @@ async function publishCall(
     // instead of throwing synchronously out of the port.
     const params = buildParams(resources.map(toBridgePayload));
     const raw = await request<unknown>(action, params, { timeoutMs });
+    const failures = readUnsuccessfulPublishes(raw);
+    if (failures.length > 0) {
+      return resultFromFailures(
+        resources,
+        failures,
+        new QortalBridgeError('error', 'Some resources were not published', action, raw),
+      );
+    }
     const list = Array.isArray(raw) ? raw : [raw];
     const submissions = list.map((entry, index) => {
       const resource = resources[index] ?? resources[resources.length - 1];
@@ -220,25 +258,7 @@ async function publishCall(
 
     const failures = readUnsuccessfulPublishes(bridgeError.detail);
     if (failures.length > 0) {
-      const failedCount = failures.length;
-      if (failedCount >= resources.length) {
-        return { kind: 'failed', error: bridgeError, failures };
-      }
-      const failedIdentifiers = new Set(
-        failures.map((failure) => `${failure.service}|${failure.identifier ?? ''}`),
-      );
-      const submissions = resources
-        .filter(
-          (resource) => !failedIdentifiers.has(`${resource.service}|${resource.identifier ?? ''}`),
-        )
-        .map<PublishSubmission>((resource) => ({
-          service: resource.service,
-          identifier: resource.identifier ?? null,
-          name: resource.name,
-          signature: null,
-          raw: null,
-        }));
-      return { kind: 'partial', submissions, failures };
+      return resultFromFailures(resources, failures, bridgeError);
     }
 
     return {
