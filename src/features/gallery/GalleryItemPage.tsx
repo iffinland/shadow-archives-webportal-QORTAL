@@ -1,6 +1,9 @@
+import { lazy, Suspense, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { useCapability } from '../../app/providers/CapabilityProvider';
 import { MediaFrame } from '../../components/common';
+import { Button } from '../../components/common';
 import { RouteLoading } from '../../components/feedback';
 import {
   EntityStatePanel,
@@ -12,9 +15,15 @@ import {
   useEntityDetail,
 } from '../content';
 
+const GalleryImageEditModal = lazy(async () => ({
+  default: (await import('./owner/GalleryImageModal')).GalleryImageModal,
+}));
+
 /** Gallery item detail: authoritative entity plus its thumbnail/media dimensions. */
 export default function GalleryItemPage() {
   const { id } = useParams<{ id: string }>();
+  const { isOwner } = useCapability();
+  const [editing, setEditing] = useState(false);
   const { status, entity, error, reload } = useEntityDetail('gallery-item', id ?? '');
   const item = entity && entity.kind === 'gallery-item' ? entity : null;
 
@@ -34,6 +43,13 @@ export default function GalleryItemPage() {
           <>
             <p className="sa-detail__meta">{formatDate(item.updatedAt) ?? 'Undated'}</p>
             <TaxonomyChips categories={item.data.categories} tags={item.data.tags} />
+            {isOwner ? (
+              <div className="sa-route__actions">
+                <Button variant="secondary" onClick={() => setEditing(true)}>
+                  Edit image
+                </Button>
+              </div>
+            ) : null}
           </>
         ) : (
           <p className="sa-route__lead">A single archived media item.</p>
@@ -75,6 +91,22 @@ export default function GalleryItemPage() {
           message={error?.message ?? undefined}
           onRetry={reload}
         />
+      ) : null}
+      {editing && item && isOwner ? (
+        <Suspense fallback={null}>
+          <GalleryImageEditModal
+            onClose={() => setEditing(false)}
+            initialDraft={{
+              id: item.id,
+              title: item.data.title,
+              description: item.data.description,
+              albumId: item.data.albumId,
+              categories: item.data.categories,
+              tags: item.data.tags,
+              language: item.data.language,
+            }}
+          />
+        </Suspense>
       ) : null}
     </div>
   );

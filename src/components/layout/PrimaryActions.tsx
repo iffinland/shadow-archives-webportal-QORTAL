@@ -14,7 +14,7 @@ export function PrimaryActions() {
       <ul className="sa-primary-actions__list">
         {externalAppTargets.map((app) => (
           <li key={app.id}>
-            <a className="sa-action-button" href={buildQortalAppUrl(app.appName)}>
+            <a className="sa-action-button" href={buildQortalAppUrl(app.appName, app.path)}>
               <span className="sa-action-button__label">{app.label}</span>
               <IconExternalApp className="sa-action-button__icon" />
               <span className="sa-visually-hidden">(opens the Qortal app in a new tab)</span>

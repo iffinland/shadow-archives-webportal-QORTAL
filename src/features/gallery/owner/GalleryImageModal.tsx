@@ -32,11 +32,21 @@ const DEFAULT_LANGUAGE = 'en';
 export interface GalleryImageModalProps {
   readonly onClose: () => void;
   readonly deps?: GalleryPublishDeps;
+  readonly initialDraft?: {
+    readonly id: string;
+    readonly title: string;
+    readonly description: string;
+    readonly albumId: string | null;
+    readonly categories: readonly string[];
+    readonly tags: readonly string[];
+    readonly language: string;
+  };
 }
 
 export function GalleryImageModal({
   onClose,
   deps = createGalleryPublishDeps(),
+  initialDraft,
 }: GalleryImageModalProps) {
   const environment = useQortalEnvironment();
   const { capability } = useCapability();
@@ -53,12 +63,14 @@ export function GalleryImageModal({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewSize, setPreviewSize] = useState<{ width: number; height: number } | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [albumId, setAlbumId] = useState('');
-  const [categories, setCategories] = useState<string[]>([]);
-  const [tags, setTags] = useState<string[]>([]);
-  const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
+  const [title, setTitle] = useState(() => initialDraft?.title ?? '');
+  const [description, setDescription] = useState(() => initialDraft?.description ?? '');
+  const [albumId, setAlbumId] = useState(() => initialDraft?.albumId ?? '');
+  const [categories, setCategories] = useState<string[]>(() => [
+    ...(initialDraft?.categories ?? []),
+  ]);
+  const [tags, setTags] = useState<string[]>(() => [...(initialDraft?.tags ?? [])]);
+  const [language, setLanguage] = useState(() => initialDraft?.language ?? DEFAULT_LANGUAGE);
   const [formError, setFormError] = useState<string | null>(null);
   const [progress, setProgress] = useState<GalleryPublishProgress | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -68,6 +80,7 @@ export function GalleryImageModal({
   const [verifyResult, setVerifyResult] = useState<GalleryVerifyResult | null>(null);
 
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
+  const editing = initialDraft !== undefined;
 
   useEffect(() => {
     return () => {
@@ -139,7 +152,7 @@ export function GalleryImageModal({
           tags,
           language,
           // Reuse the identity of a previous attempt so a retry cannot duplicate.
-          id: result?.id,
+          id: result?.id ?? initialDraft?.id,
         },
         {
           onProgress: setProgress,
@@ -192,8 +205,12 @@ export function GalleryImageModal({
 
   return (
     <Modal
-      title="Add gallery image"
-      description="Publishes the image, its thumbnail and the Gallery metadata under this app's publishing name."
+      title={editing ? 'Edit gallery image' : 'Add gallery image'}
+      description={
+        editing
+          ? 'Replaces this image at its existing QDN identity and updates its Gallery catalog entry.'
+          : "Publishes the image, its thumbnail and the Gallery metadata under this app's publishing name."
+      }
       onRequestClose={onClose}
       canClose={!critical}
       initialFocusRef={firstFieldRef}
@@ -205,7 +222,7 @@ export function GalleryImageModal({
               Cancel
             </Button>
             <Button variant="primary" onClick={() => void onPublish()} disabled={critical}>
-              {critical ? 'Publishing…' : 'Publish'}
+              {critical ? 'Publishing…' : editing ? 'Save changes' : 'Publish'}
             </Button>
           </div>
         )
@@ -237,6 +254,12 @@ export function GalleryImageModal({
             <label className="sa-field__label" htmlFor="sa-image-file">
               Image file (JPEG, PNG or WebP)
             </label>
+            {editing ? (
+              <p className="sa-field__hint">
+                Choose the current or a replacement image. It is republished at the same QDN
+                identity, without creating a second item.
+              </p>
+            ) : null}
             <input
               id="sa-image-file"
               className="sa-input"

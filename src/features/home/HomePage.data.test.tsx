@@ -95,10 +95,10 @@ describe('HomePage with a validated archive snapshot', () => {
       `/gallery/item/${TEST_ITEM_ID}`,
     );
 
-    // The injected loader is the data seam, so no bridge read is issued at all;
-    // in particular, browsing never authenticates.
-    expect(bridge).not.toHaveBeenCalled();
-    expect(screen.queryByText(/GET_USER_ACCOUNT/)).not.toBeInTheDocument();
+    // The injected loader remains the catalog-data seam. The direct Qortal-host
+    // mount performs one account check and cards independently read their QDN
+    // engagement counters.
+    expect(bridge.mock.calls.some((call) => call[0]?.action === 'GET_USER_ACCOUNT')).toBe(true);
   });
 
   it('keeps Top Posts and Top Videos honest instead of fabricating a ranking', async () => {

@@ -8,8 +8,8 @@ import { useCapability } from '../../app/providers/CapabilityProvider';
  *
  * Studio is appended after Contact ONLY for a positively verified owner
  * capability. The capability is consumed from the session state that the
- * explicit `/studio` owner flow establishes; rendering navigation never
- * requests an account or permission, so ordinary visitors stay permission-free.
+ * verified host capability. Rendering navigation never makes an account
+ * request itself; AuthProvider performs the one hosted-runtime check.
  */
 export function SiteNav() {
   const { capability } = useCapability();

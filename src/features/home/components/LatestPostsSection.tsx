@@ -32,12 +32,12 @@ function LatestPostsView({ data }: { readonly data: CollectionState<ContentCardM
       />
       <div className="sa-section__body">
         {data.status === 'loading' ? (
-          <SkeletonGroup label="Loading latest posts" className="sa-card-grid">
+          <SkeletonGroup label="Loading latest posts" className="sa-card-grid sa-card-grid--home">
             <ContentCardSkeleton />
             <ContentCardSkeleton />
           </SkeletonGroup>
         ) : data.status === 'ready' && data.items.length > 0 ? (
-          <div className="sa-card-grid">
+          <div className="sa-card-grid sa-card-grid--home">
             {data.items.map((item) => (
               <ContentCard key={item.id} item={item} />
             ))}

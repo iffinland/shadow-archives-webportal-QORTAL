@@ -15,6 +15,8 @@ export interface ExternalAppTarget {
   readonly label: string;
   /** Published Q-App name used to build `qortal://APP/<name>`. */
   readonly appName: string;
+  /** Publisher-specific route within that Q-App. */
+  readonly path: string;
 }
 
 export interface NavItem {
@@ -41,9 +43,9 @@ export const siteConfig = {
    */
   verifiedOn: '2026-09-11',
   externalApps: [
-    { id: 'qtube', label: 'Q-Tube', appName: 'Q-Tube' },
-    { id: 'subwire', label: 'SubWire', appName: 'SubWire' },
-    { id: 'quitter', label: 'Quitter', appName: 'Quitter' },
+    { id: 'qtube', label: 'Q-Tube', appName: 'Q-Tube', path: '/channel/Shadow%20Archives' },
+    { id: 'subwire', label: 'SubWire', appName: 'SubWire', path: '/author/Shadow%20Archives' },
+    { id: 'quitter', label: 'Quitter', appName: 'Quitter', path: '/user/Shadow%20Archives' },
   ] satisfies readonly ExternalAppTarget[],
 
   navItems: [
@@ -60,8 +62,9 @@ export const siteConfig = {
    * item only while the session holds a positively verified owner capability.
    * It is absent for visitors, unknown/unauthenticated sessions, accounts with
    * no registered name, authenticated non-owners and permission failures.
-   * Deciding this must never issue `GET_USER_ACCOUNT`: capability stays `unknown`
-   * until the owner explicitly enters owner mode on `/studio`.
+   * The decision itself never issues `GET_USER_ACCOUNT`. AuthProvider performs
+   * the one hosted-runtime account check and CapabilityProvider derives the
+   * result from that verified state.
    */
   ownerNavItems: [{ to: '/studio', label: 'Studio' }] satisfies readonly NavItem[],
 

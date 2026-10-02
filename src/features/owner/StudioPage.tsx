@@ -14,15 +14,10 @@ import type { CapabilityState, QdnEnvironment } from '../../qortal/types';
 /**
  * Owner / Studio capability shell.
  *
- * This route lives behind its own lazy boundary and is not linked from public
- * navigation, so it contributes nothing to the visitor startup graph. It is an
- * information and capability shell only: it verifies whether the account
- * currently connected in the Qortal host owns this application's publishing
- * name, and it contains NO publishing, editing, moderation or other write
- * control.
- *
- * The single `GET_USER_ACCOUNT` call is issued only from the explicit "Enter
- * owner mode" action below. Loading this page never requests permission.
+ * This route remains an owner diagnostics and recovery surface; creation and
+ * edit controls are exposed directly on their content routes after AuthProvider
+ * verifies the currently connected Qortal account. It contains NO publishing,
+ * editing, moderation or other write control itself.
  */
 
 function shortenAddress(address: string): string {

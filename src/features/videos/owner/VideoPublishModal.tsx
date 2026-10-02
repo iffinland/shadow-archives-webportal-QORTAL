@@ -51,6 +51,15 @@ export type VideoProbe = (file: File) => Promise<VideoProbeResult>;
 
 export interface VideoPublishModalProps {
   readonly onClose: () => void;
+  readonly initialDraft?: {
+    readonly id: string;
+    readonly title: string;
+    readonly description: string;
+    readonly categories: readonly string[];
+    readonly tags: readonly string[];
+    readonly language: string;
+    readonly durationSeconds: number;
+  };
   /** Test seam; production uses the real bridge-backed dependencies. */
   readonly deps?: VideoPublishDeps;
   /** Test seam; production uses the bounded browser `<video>` probe. */
@@ -70,6 +79,7 @@ export function VideoPublishModal({
   onClose,
   deps = createVideoPublishDeps(),
   probe = probeVideoFile,
+  initialDraft,
 }: VideoPublishModalProps) {
   const environment = useQortalEnvironment();
   const { capability } = useCapability();
@@ -85,17 +95,21 @@ export function VideoPublishModal({
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
   const [videoError, setVideoError] = useState<string | null>(null);
-  const [durationInput, setDurationInput] = useState('');
+  const [durationInput, setDurationInput] = useState(() =>
+    initialDraft ? String(initialDraft.durationSeconds) : '',
+  );
   const [probing, setProbing] = useState(false);
   const [probeNote, setProbeNote] = useState<string | null>(null);
   const [posterFile, setPosterFile] = useState<File | null>(null);
   const [posterPreviewUrl, setPosterPreviewUrl] = useState<string | null>(null);
   const [posterError, setPosterError] = useState<string | null>(null);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [categories, setCategories] = useState<string[]>([]);
-  const [tags, setTags] = useState<string[]>([]);
-  const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
+  const [title, setTitle] = useState(() => initialDraft?.title ?? '');
+  const [description, setDescription] = useState(() => initialDraft?.description ?? '');
+  const [categories, setCategories] = useState<string[]>(() => [
+    ...(initialDraft?.categories ?? []),
+  ]);
+  const [tags, setTags] = useState<string[]>(() => [...(initialDraft?.tags ?? [])]);
+  const [language, setLanguage] = useState(() => initialDraft?.language ?? DEFAULT_LANGUAGE);
   const [formError, setFormError] = useState<string | null>(null);
   const [progress, setProgress] = useState<VideoPublishProgress | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -109,7 +123,8 @@ export function VideoPublishModal({
    * Retained across attempts so resubmitting reuses the same QDN coordinates.
    * Only ever set from a returned publication (the service generates the id).
    */
-  const draftIdRef = useRef<string | null>(null);
+  const draftIdRef = useRef<string | null>(initialDraft?.id ?? null);
+  const editing = initialDraft !== undefined;
   /** Guards against a slow probe overwriting a newer file selection. */
   const probeSeqRef = useRef(0);
 
@@ -293,8 +308,12 @@ export function VideoPublishModal({
 
   return (
     <Modal
-      title="Add video"
-      description="Publishes the video, its poster, the Shadow Archives metadata and a Q-Tube-compatible listing resource under this app's publishing name."
+      title={editing ? 'Edit video' : 'Add video'}
+      description={
+        editing
+          ? 'Replaces this video at its existing QDN identity and updates its Q-Tube metadata and catalog entry.'
+          : "Publishes the video, its poster, the Shadow Archives metadata and a Q-Tube-compatible listing resource under this app's publishing name."
+      }
       onRequestClose={onClose}
       canClose={!critical}
       initialFocusRef={firstFieldRef}
@@ -306,7 +325,7 @@ export function VideoPublishModal({
               Cancel
             </Button>
             <Button variant="primary" onClick={() => void onPublish()} disabled={critical}>
-              {critical ? 'Publishing…' : 'Publish'}
+              {critical ? 'Publishing…' : editing ? 'Save changes' : 'Publish'}
             </Button>
           </div>
         )
@@ -340,7 +359,9 @@ export function VideoPublishModal({
             </label>
             <p className="sa-field__hint">
               The host accepts uploads up to {formatByteSize(VIDEO_MEDIA_POLICY.maxSourceBytes)}.
-              The video bytes are sent to the host once and are never copied into QDN twice.
+              {editing
+                ? 'Choose the current or a replacement video. It is republished at the same QDN identity, without creating a second post.'
+                : 'The video bytes are sent to the host once and are never copied into QDN twice.'}
             </p>
             <input
               id="sa-video-file"
@@ -400,8 +421,9 @@ export function VideoPublishModal({
               Poster image (JPEG, PNG or WebP)
             </label>
             <p className="sa-field__hint">
-              Required. Published as the QDN thumbnail and embedded in the Q-Tube-compatible
-              metadata, so Q-Tube shows a real preview frame.
+              {editing
+                ? 'Choose the current or a replacement poster so the QDN thumbnail and Q-Tube metadata remain consistent.'
+                : 'Required. Published as the QDN thumbnail and embedded in the Q-Tube-compatible metadata, so Q-Tube shows a real preview frame.'}
             </p>
             <input
               id="sa-video-poster"

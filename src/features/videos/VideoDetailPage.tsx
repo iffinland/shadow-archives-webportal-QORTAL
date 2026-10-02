@@ -1,6 +1,9 @@
+import { lazy, Suspense, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
+import { useCapability } from '../../app/providers/CapabilityProvider';
 import { MediaFrame } from '../../components/common';
+import { Button } from '../../components/common';
 import { RouteLoading } from '../../components/feedback';
 import { formatDurationLabel } from '../../domain/videoMedia';
 import {
@@ -11,6 +14,10 @@ import {
   mediaRefSrc,
   useEntityDetail,
 } from '../content';
+
+const VideoEditModal = lazy(async () => ({
+  default: (await import('./owner/VideoPublishModal')).VideoPublishModal,
+}));
 
 /**
  * Video detail with native playback.
@@ -23,6 +30,8 @@ import {
  */
 export default function VideoDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { isOwner } = useCapability();
+  const [editing, setEditing] = useState(false);
   const { status, entity, error, reload } = useEntityDetail('video', id ?? '');
   const video = entity && entity.kind === 'video' ? entity : null;
 
@@ -46,6 +55,13 @@ export default function VideoDetailPage() {
                 : ''}
             </p>
             <TaxonomyChips categories={video.data.categories} tags={video.data.tags} />
+            {isOwner ? (
+              <div className="sa-route__actions">
+                <Button variant="secondary" onClick={() => setEditing(true)}>
+                  Edit video
+                </Button>
+              </div>
+            ) : null}
           </>
         ) : (
           <p className="sa-route__lead">A single archived video and its stored metadata.</p>
@@ -125,6 +141,22 @@ export default function VideoDetailPage() {
           message={error?.message ?? undefined}
           onRetry={reload}
         />
+      ) : null}
+      {editing && video && isOwner ? (
+        <Suspense fallback={null}>
+          <VideoEditModal
+            onClose={() => setEditing(false)}
+            initialDraft={{
+              id: video.id,
+              title: video.data.title,
+              description: video.data.description,
+              categories: video.data.categories,
+              tags: video.data.tags,
+              language: video.data.language,
+              durationSeconds: video.data.durationSeconds,
+            }}
+          />
+        </Suspense>
       ) : null}
     </div>
   );

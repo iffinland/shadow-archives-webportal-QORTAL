@@ -219,16 +219,21 @@
     inset 0 1px 0 color-mix(in srgb, var(--sa-color-accent-hover) 60%, transparent);
   transition:
     background-color var(--sa-motion-fast) var(--sa-motion-easing),
+    box-shadow var(--sa-motion-fast) var(--sa-motion-easing),
     transform var(--sa-motion-fast) var(--sa-motion-easing);
 }
 
 .sa-action-button:hover {
   background: var(--sa-color-accent-hover);
+  box-shadow:
+    var(--sa-shadow-2),
+    inset 0 1px 0 color-mix(in srgb, var(--sa-color-accent-hover) 60%, transparent);
+  transform: translateY(-1px);
 }
 
 .sa-action-button:active {
   transform: translateY(1px);
-  box-shadow: none;
+  box-shadow: var(--sa-shadow-0);
 }
 
 .sa-action-button__icon {
@@ -300,23 +305,38 @@
   min-height: var(--sa-hit-target);
   padding: var(--sa-space-2) var(--sa-space-4);
   border-radius: var(--sa-radius-sm);
-  border-bottom: 2px solid transparent;
+  border: 1px solid var(--sa-color-border);
   color: var(--sa-color-text-muted);
   font-size: var(--sa-text-sm);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   text-decoration: none;
-  transition: background-color var(--sa-motion-fast) var(--sa-motion-easing);
+  background: var(--sa-color-surface-raised);
+  box-shadow: var(--sa-shadow-1), var(--sa-shadow-inset-paper);
+  transition:
+    background-color var(--sa-motion-fast) var(--sa-motion-easing),
+    border-color var(--sa-motion-fast) var(--sa-motion-easing),
+    box-shadow var(--sa-motion-fast) var(--sa-motion-easing),
+    color var(--sa-motion-fast) var(--sa-motion-easing),
+    transform var(--sa-motion-fast) var(--sa-motion-easing);
 }
 
 .sa-site-nav__link:hover {
   color: var(--sa-color-text);
   background: var(--sa-color-surface-raised-hover);
+  border-color: var(--sa-color-accent);
+  box-shadow: var(--sa-shadow-2), var(--sa-shadow-inset-paper);
+  transform: translateY(-1px);
 }
 
 .sa-site-nav__link--active {
   color: var(--sa-color-text);
-  border-bottom-color: var(--sa-color-accent);
+  border-color: var(--sa-color-accent);
+}
+
+.sa-site-nav__link:active {
+  box-shadow: var(--sa-shadow-0);
+  transform: translateY(1px);
 }
 
 /* ------------------------------------------------------------------ main -- */
@@ -388,6 +408,7 @@
   font-family: inherit;
   font-size: var(--sa-text-sm);
   font-weight: 600;
+  box-shadow: var(--sa-shadow-1), var(--sa-shadow-inset-paper);
   cursor: pointer;
   transition:
     background-color var(--sa-motion-fast) var(--sa-motion-easing),
@@ -398,9 +419,12 @@
 .sa-button:hover {
   background: var(--sa-color-surface-raised-hover);
   border-color: var(--sa-color-accent);
+  box-shadow: var(--sa-shadow-2), var(--sa-shadow-inset-paper);
+  transform: translateY(-1px);
 }
 
 .sa-button:active {
+  box-shadow: var(--sa-shadow-0);
   transform: translateY(1px);
 }
 

@@ -43,11 +43,9 @@ interface AuthContextValue {
   readonly ownsAnyName: boolean | null;
   readonly ownershipResolved: boolean;
   /**
-   * Explicit, user-triggered authentication. It is intentionally NOT called for
-   * an ordinary mount: the visitor shell must remain permission-free, and
-   * capability stays `unknown` until a real answer exists. Concurrent calls
-   * share one request. A mount restores only when this tab previously marked an
-   * explicit owner-mode session (see `restoreAttemptedRef` below).
+   * Starts the single owner-capability verification flow. Calls share one
+   * request, so the automatic hosted-runtime check and an owner action cannot
+   * create duplicate account prompts.
    */
   readonly authenticate: (options?: AuthenticateOptions) => Promise<void>;
   /** Abandon a pending capability run and return the app to read-only. */
@@ -167,24 +165,23 @@ export function AuthProvider({ children, initialAccount = null }: AuthProviderPr
   );
 
   /**
-   * Tab-scoped restoration after a real document reload.
-   *
-   * With no marker this effect does nothing at all: no account request, no
-   * permission prompt, so the visitor shell stays permission-free. With a marker
-   * in a `qortal-host` runtime it re-runs the full verification (current account
-   * + current name owner); owner controls stay hidden until that proof exists.
-   * The ref guard makes this once per mount, and the marker is removed by
-   * `verifyOwnerMode` on every non-owner outcome, so a failed restore cannot
-   * turn into a retry loop.
+   * One automatic owner check per direct Qortal-host mount. This removes the
+   * former `/studio` prerequisite: a positively verified owner immediately sees
+   * creation and edit controls on the content routes. The call is deliberately
+   * excluded from the dev proxy and read-only render contexts, which cannot
+   * establish write authority. Hub may ask for account access on first use.
    */
   const restoreAttemptedRef = useRef(false);
   useEffect(() => {
     if (restoreAttemptedRef.current) return;
     restoreAttemptedRef.current = true;
-    if (!isOwnerModeMarked()) return;
     if (environment.runtimeState !== 'qortal-host') return;
-    void verifyOwnerMode();
-  }, [environment.runtimeState, verifyOwnerMode]);
+    if (isOwnerModeMarked()) {
+      void verifyOwnerMode();
+      return;
+    }
+    void authenticate();
+  }, [authenticate, environment.runtimeState, verifyOwnerMode]);
 
   const cancel = useCallback(() => {
     generationRef.current += 1;

@@ -22,8 +22,9 @@ interface AppProvidersProps {
  * Provider order follows the approved Phase 1A structure (§1.4):
  * bridge -> auth -> capability -> content (cache/catalog) -> design tokens -> router.
  *
- * The content provider performs only public, idempotent QDN reads. Authentication
- * remains dormant unless an explicit owner flow requests it.
+ * The content provider performs only public, idempotent QDN reads. In a direct
+ * Qortal-host runtime, AuthProvider separately performs one account check so a
+ * verified owner can use content controls without first visiting Studio.
  */
 export function AppProviders({
   children,

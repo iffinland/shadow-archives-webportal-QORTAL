@@ -8,7 +8,8 @@ import type { CollectionState, ContentCardModel } from '../../types/content';
  * cards use catalog/thumbnail metadata only: home never fetches a blog body,
  * video bytes or a gallery original.
  */
-export const HOME_PREVIEW_COUNT = 4;
+/** Each home section is intentionally a compact two-item preview. */
+export const HOME_PREVIEW_COUNT = 2;
 export const GALLERY_STRIP_COUNT = 8;
 
 export function useLatestPosts(): CollectionState<ContentCardModel> {

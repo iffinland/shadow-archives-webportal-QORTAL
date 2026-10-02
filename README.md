@@ -76,8 +76,10 @@ src/
   the shim itself uses (`/arbitrary/resources/search`, `/arbitrary/{service}/{name}`).
   This fallback is read-only; writes stay bridge-only and owner-gated.
 - `auth.ts` implements single-flight `GET_USER_ACCOUNT` with a session-cached
-  rejection. It is **not** called at startup: the visitor shell never opens a
-  permission dialog.
+  rejection. A direct Qortal-host load checks the current account once so a
+  verified owner immediately sees creation and edit controls; dev-proxy and
+  read-only render contexts never make that request. Hub may ask for account
+  access on first use.
 - `capability.ts` derives `unknown | visitor | authenticated-no-name |
 authenticated-non-owner | owner`; it never reports `owner` optimistically.
 - `navigation.ts` builds the verified `qortal://APP/<name>` links.

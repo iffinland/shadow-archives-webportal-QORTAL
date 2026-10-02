@@ -41,6 +41,15 @@ const DEFAULT_LANGUAGE = 'en';
 
 export interface BlogPublishModalProps {
   readonly onClose: () => void;
+  readonly initialDraft?: {
+    readonly id: string;
+    readonly title: string;
+    readonly excerpt: string;
+    readonly body: RichTextDocument;
+    readonly categories: readonly string[];
+    readonly tags: readonly string[];
+    readonly language: string;
+  };
   /** Test seam; production uses the real bridge-backed dependencies. */
   readonly deps?: BlogPublishDeps;
   /** Test seam; production renders the lazy TipTap editor. */
@@ -67,6 +76,7 @@ export function BlogPublishModal({
   onClose,
   deps = createBlogPublishDeps(),
   renderEditor = defaultRenderEditor,
+  initialDraft,
 }: BlogPublishModalProps) {
   const environment = useQortalEnvironment();
   const { capability } = useCapability();
@@ -79,15 +89,17 @@ export function BlogPublishModal({
     [capability, account, environment],
   );
 
-  const [title, setTitle] = useState('');
-  const [excerpt, setExcerpt] = useState('');
-  const [body, setBody] = useState<RichTextDocument | null>(null);
+  const [title, setTitle] = useState(() => initialDraft?.title ?? '');
+  const [excerpt, setExcerpt] = useState(() => initialDraft?.excerpt ?? '');
+  const [body, setBody] = useState<RichTextDocument | null>(() => initialDraft?.body ?? null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState<string | null>(null);
   const [coverError, setCoverError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [tags, setTags] = useState<string[]>([]);
-  const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
+  const [categories, setCategories] = useState<string[]>(() => [
+    ...(initialDraft?.categories ?? []),
+  ]);
+  const [tags, setTags] = useState<string[]>(() => [...(initialDraft?.tags ?? [])]);
+  const [language, setLanguage] = useState(() => initialDraft?.language ?? DEFAULT_LANGUAGE);
   const [quitterOptIn, setQuitterOptIn] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [progress, setProgress] = useState<BlogPublishProgress | null>(null);
@@ -104,7 +116,8 @@ export function BlogPublishModal({
 
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
   /** Retained across attempts so resubmitting reuses the same QDN coordinates. */
-  const draftIdRef = useRef<string | null>(null);
+  const draftIdRef = useRef<string | null>(initialDraft?.id ?? null);
+  const editing = initialDraft !== undefined;
 
   useEffect(() => {
     return () => {
@@ -259,8 +272,12 @@ export function BlogPublishModal({
 
   return (
     <Modal
-      title="Add blog post"
-      description="Publishes the article, its cover, the Shadow Archives metadata and a SubWire-compatible article resource under this app's publishing name."
+      title={editing ? 'Edit blog post' : 'Add blog post'}
+      description={
+        editing
+          ? 'Replaces this post at its existing QDN identity and updates its derived SubWire article and catalog entry.'
+          : "Publishes the article, its cover, the Shadow Archives metadata and a SubWire-compatible article resource under this app's publishing name."
+      }
       onRequestClose={onClose}
       canClose={!critical}
       initialFocusRef={firstFieldRef}
@@ -317,6 +334,7 @@ export function BlogPublishModal({
           <div className="sa-field">
             <span className="sa-field__label">Article body</span>
             {renderEditor({
+              initialDoc: initialDraft?.body.doc,
               onChange: setBody,
               disabled: critical,
             })}
@@ -327,8 +345,9 @@ export function BlogPublishModal({
               Cover image (JPEG, PNG or WebP)
             </label>
             <p className="sa-field__hint">
-              Required. Published as the QDN thumbnail and embedded in the SubWire-compatible
-              article, so SubWire shows the same cover.
+              {editing
+                ? 'Choose the current or a replacement cover. It is republished at the same QDN identity so the authoritative post and derived SubWire article remain consistent.'
+                : 'Required. Published as the QDN thumbnail and embedded in the SubWire-compatible article, so SubWire shows the same cover.'}
             </p>
             <input
               id="sa-blog-cover"
@@ -435,7 +454,7 @@ export function BlogPublishModal({
 
           <div className="sa-route__actions">
             <Button variant="primary" type="submit" disabled={critical}>
-              {submitting ? 'Publishing…' : 'Publish article'}
+              {submitting ? 'Publishing…' : editing ? 'Save changes' : 'Publish article'}
             </Button>
             <Button variant="ghost" onClick={onClose} disabled={critical}>
               Cancel

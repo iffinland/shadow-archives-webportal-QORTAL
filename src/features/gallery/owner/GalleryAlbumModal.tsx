@@ -26,11 +26,20 @@ const DEFAULT_LANGUAGE = 'en';
 export interface GalleryAlbumModalProps {
   readonly onClose: () => void;
   readonly deps?: GalleryPublishDeps;
+  readonly initialDraft?: {
+    readonly id: string;
+    readonly title: string;
+    readonly description: string;
+    readonly categories: readonly string[];
+    readonly tags: readonly string[];
+    readonly language: string;
+  };
 }
 
 export function GalleryAlbumModal({
   onClose,
   deps = createGalleryPublishDeps(),
+  initialDraft,
 }: GalleryAlbumModalProps) {
   const environment = useQortalEnvironment();
   const { capability } = useCapability();
@@ -43,11 +52,13 @@ export function GalleryAlbumModal({
     [capability, account, environment],
   );
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [categories, setCategories] = useState<string[]>([]);
-  const [tags, setTags] = useState<string[]>([]);
-  const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
+  const [title, setTitle] = useState(() => initialDraft?.title ?? '');
+  const [description, setDescription] = useState(() => initialDraft?.description ?? '');
+  const [categories, setCategories] = useState<string[]>(() => [
+    ...(initialDraft?.categories ?? []),
+  ]);
+  const [tags, setTags] = useState<string[]>(() => [...(initialDraft?.tags ?? [])]);
+  const [language, setLanguage] = useState(() => initialDraft?.language ?? DEFAULT_LANGUAGE);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [progress, setProgress] = useState<GalleryPublishProgress | null>(null);
@@ -56,6 +67,7 @@ export function GalleryAlbumModal({
   const [verifyResult, setVerifyResult] = useState<GalleryVerifyResult | null>(null);
 
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
+  const editing = initialDraft !== undefined;
 
   const validateForm = (): string | null => {
     if (!title.trim()) return 'A title is required.';
@@ -86,7 +98,7 @@ export function GalleryAlbumModal({
           categories,
           tags,
           language,
-          id: result?.id,
+          id: result?.id ?? initialDraft?.id,
         },
         { onProgress: setProgress },
         deps,
@@ -127,8 +139,12 @@ export function GalleryAlbumModal({
 
   return (
     <Modal
-      title="Create gallery album"
-      description="Albums group Gallery items. No separate image upload is required."
+      title={editing ? 'Edit gallery album' : 'Create gallery album'}
+      description={
+        editing
+          ? 'Replaces this album metadata at its existing QDN identity and updates its Gallery catalog entry.'
+          : 'Albums group Gallery items. No separate image upload is required.'
+      }
       onRequestClose={onClose}
       canClose={!submitting}
       initialFocusRef={firstFieldRef}
@@ -139,7 +155,7 @@ export function GalleryAlbumModal({
               Cancel
             </Button>
             <Button variant="primary" onClick={() => void onPublish()} disabled={submitting}>
-              {submitting ? 'Publishing…' : 'Publish'}
+              {submitting ? 'Publishing…' : editing ? 'Save changes' : 'Publish'}
             </Button>
           </div>
         )

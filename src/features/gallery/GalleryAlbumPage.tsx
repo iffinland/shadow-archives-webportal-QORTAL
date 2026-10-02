@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 
-import { IconImage } from '../../components/common';
+import { useCapability } from '../../app/providers/CapabilityProvider';
+import { Button, IconImage } from '../../components/common';
 import { resolveEntityReference } from '../../domain';
 import { RouteLoading } from '../../components/feedback';
 import {
@@ -16,6 +17,10 @@ import {
 } from '../content';
 import { collectionStateFromSnapshot, listingToCard } from '../content/listing/listingModel';
 
+const GalleryAlbumEditModal = lazy(async () => ({
+  default: (await import('./owner/GalleryAlbumModal')).GalleryAlbumModal,
+}));
+
 /**
  * Album detail: authoritative album entity plus its items from the loaded
  * catalog. Item membership is read from catalog metadata, so opening an album
@@ -23,6 +28,8 @@ import { collectionStateFromSnapshot, listingToCard } from '../content/listing/l
  */
 export default function GalleryAlbumPage() {
   const { id } = useParams<{ id: string }>();
+  const { isOwner } = useCapability();
+  const [editing, setEditing] = useState(false);
   const { status, entity, error, reload } = useEntityDetail('gallery-album', id ?? '');
   const album = entity && entity.kind === 'gallery-album' ? entity : null;
 
@@ -51,6 +58,13 @@ export default function GalleryAlbumPage() {
           <>
             <p className="sa-detail__meta">{formatDate(album.updatedAt) ?? 'Undated'}</p>
             <TaxonomyChips categories={album.data.categories} tags={album.data.tags} />
+            {isOwner ? (
+              <div className="sa-route__actions">
+                <Button variant="secondary" onClick={() => setEditing(true)}>
+                  Edit album
+                </Button>
+              </div>
+            ) : null}
           </>
         ) : (
           <p className="sa-route__lead">An album of archived media.</p>
@@ -86,6 +100,21 @@ export default function GalleryAlbumPage() {
           message={error?.message ?? undefined}
           onRetry={reload}
         />
+      ) : null}
+      {editing && album && isOwner ? (
+        <Suspense fallback={null}>
+          <GalleryAlbumEditModal
+            onClose={() => setEditing(false)}
+            initialDraft={{
+              id: album.id,
+              title: album.data.title,
+              description: album.data.description,
+              categories: album.data.categories,
+              tags: album.data.tags,
+              language: album.data.language,
+            }}
+          />
+        </Suspense>
       ) : null}
     </div>
   );

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { renderApp } from '../../test/utils';
@@ -79,10 +79,8 @@ function navLabels(): string[] {
 }
 
 async function runOwnerFlow(): Promise<void> {
-  const user = userEvent.setup();
   renderApp({ route: '/studio', environment: HOSTED, archiveLoader });
   await screen.findByRole('heading', { level: 1, name: 'Owner studio' });
-  await user.click(screen.getByRole('button', { name: 'Enter owner mode' }));
   await screen.findByText('Owner capability verified');
 }
 
@@ -103,14 +101,14 @@ describe('SiteNav — public navigation', () => {
     expect(navLabels()).toEqual(['Home', 'Blog', 'Videos', 'Gallery', 'About', 'Contact']);
   });
 
-  it('contains no Studio link for a visitor and never requests an account', () => {
-    const bridge = installBridge();
+  it('contains no Studio link for a visitor after the automatic account check', async () => {
+    const bridge = installBridge({ account: { address: OTHER, publicKey: 'K' }, names: [] });
     renderApp({ route: '/', environment: HOSTED, archiveLoader });
 
+    await waitFor(() => expect(accountCalls(bridge)).toHaveLength(1));
     expect(navLabels()).not.toContain('Studio');
     expect(screen.queryByRole('link', { name: 'Studio' })).not.toBeInTheDocument();
-    // Browsing may issue public reads (catalog), but never GET_USER_ACCOUNT.
-    expect(accountCalls(bridge)).toHaveLength(0);
+    expect(accountCalls(bridge)).toHaveLength(1);
   });
 
   it('contains no Studio link for an authenticated non-owner', async () => {
@@ -118,10 +116,8 @@ describe('SiteNav — public navigation', () => {
       account: { address: OTHER, publicKey: 'K' },
       names: [{ name: 'Some Other Name', owner: OTHER }],
     });
-    const user = userEvent.setup();
     renderApp({ route: '/studio', environment: HOSTED, archiveLoader });
     await screen.findByRole('heading', { level: 1, name: 'Owner studio' });
-    await user.click(screen.getByRole('button', { name: 'Enter owner mode' }));
 
     await screen.findByText('Signed in — not the owner');
     expect(navLabels()).not.toContain('Studio');
@@ -132,10 +128,8 @@ describe('SiteNav — public navigation', () => {
       account: { address: OTHER, publicKey: 'K' },
       names: [],
     });
-    const user = userEvent.setup();
     renderApp({ route: '/studio', environment: HOSTED, archiveLoader });
     await screen.findByRole('heading', { level: 1, name: 'Owner studio' });
-    await user.click(screen.getByRole('button', { name: 'Enter owner mode' }));
 
     await screen.findByText('No registered Qortal name');
     expect(navLabels()).not.toContain('Studio');
@@ -154,10 +148,8 @@ describe('SiteNav — public navigation', () => {
       value: bridge,
     });
 
-    const user = userEvent.setup();
     renderApp({ route: '/studio', environment: HOSTED, archiveLoader });
     await screen.findByRole('heading', { level: 1, name: 'Owner studio' });
-    await user.click(screen.getByRole('button', { name: 'Enter owner mode' }));
 
     await screen.findByText('Account access was declined');
     expect(navLabels()).not.toContain('Studio');

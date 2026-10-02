@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   publishComment,
+  readEngagementCounts,
   sendTip,
   setLike,
   type EngagementDeps,
@@ -18,7 +19,7 @@ const target: EngagementTarget = {
 function deps(): EngagementDeps {
   return {
     publish: {
-      publishResource: vi.fn(async () => ({ kind: 'submitted', submissions: [] })),
+      publishResource: vi.fn(async () => ({ kind: 'submitted' as const, submissions: [] })),
       publishResources: vi.fn(),
     },
     getNameOwner: vi.fn(async () => ({ name: 'Shadow Archives', owner: 'Qabc' })),
@@ -66,6 +67,47 @@ describe('engagement service', () => {
       coin: 'QORT',
       recipient: 'Qabc',
       amount: 0.25,
+    });
+  });
+
+  it('does not claim a tip was sent when Hub returns no transaction signature', async () => {
+    const service: EngagementDeps = { ...deps(), sendCoin: vi.fn(async () => ({})) };
+    await expect(sendTip(target, 0.25, service)).resolves.toMatchObject({ kind: 'failed' });
+  });
+
+  it('counts active likes and QDN comments from their canonical resource namespaces', async () => {
+    const reader = {
+      search: vi.fn(async (request: { identifier?: string }) =>
+        request.identifier?.startsWith('saw_lk_')
+          ? [
+              { service: 'DOCUMENT', name: 'Reader One', identifier: 'saw_lk_post_abc123def456' },
+              { service: 'DOCUMENT', name: 'Reader Two', identifier: 'saw_lk_post_abc123def456' },
+            ]
+          : [
+              {
+                service: 'DOCUMENT',
+                name: 'Reader One',
+                identifier: 'saw_cmt_post_abc123def456_a1b2c3d4',
+              },
+              {
+                service: 'DOCUMENT',
+                name: 'Reader Two',
+                identifier: 'saw_cmt_post_abc123def456_e5f6g7h8',
+              },
+            ],
+      ),
+      fetchText: vi.fn(async (ref: { name: string }) =>
+        JSON.stringify({
+          kind: 'like-state',
+          state: ref.name === 'Reader One' ? 'active' : 'inactive',
+          target: { name: 'Shadow Archives', identifier: 'saw_post_abc123def456' },
+        }),
+      ),
+    };
+
+    await expect(readEngagementCounts(target, { reader })).resolves.toEqual({
+      likes: 1,
+      comments: 2,
     });
   });
 

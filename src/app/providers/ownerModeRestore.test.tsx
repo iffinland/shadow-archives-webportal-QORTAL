@@ -100,8 +100,8 @@ function navLabels(): string[] {
 }
 
 async function enterOwnerMode(user: ReturnType<typeof userEvent.setup>): Promise<void> {
+  void user;
   await screen.findByRole('heading', { level: 1, name: 'Owner studio' });
-  await user.click(screen.getByRole('button', { name: 'Enter owner mode' }));
   await screen.findByText('Owner capability verified');
 }
 
@@ -240,14 +240,16 @@ describe('owner mode across a real document reload', () => {
 });
 
 describe('owner mode restoration gating', () => {
-  it('issues no account request when no marker is present', async () => {
+  it('automatically verifies the current account in a qortal-host runtime', async () => {
     const bridge = installBridge();
 
     mountHosted('/gallery');
     await screen.findByRole('heading', { level: 1, name: 'Gallery' });
 
-    expect(marker()).toBeNull();
-    expect(callsFor(bridge, 'GET_USER_ACCOUNT')).toHaveLength(0);
+    await screen.findByLabelText('Owner gallery controls');
+    expect(marker()).toBe(OWNER_MODE_STORAGE_VALUE);
+    expect(callsFor(bridge, 'GET_USER_ACCOUNT')).toHaveLength(1);
+    expect(callsFor(bridge, 'GET_NAME_DATA')).toHaveLength(1);
   });
 
   it('does not restore outside a qortal-host runtime even with a marker', async () => {

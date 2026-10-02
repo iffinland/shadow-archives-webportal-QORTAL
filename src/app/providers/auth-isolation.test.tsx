@@ -6,9 +6,9 @@ import { makeEnvironment } from '../../test/environment';
 import { resetAuthSession } from '../../qortal/auth';
 
 /**
- * The core Phase 2B invariant: ordinary archive browsing must never request an
- * account. These tests mount the real providers and route table with a bridge
- * present and assert `GET_USER_ACCOUNT` is never issued.
+ * A direct Qortal-host mount checks the current account once so verified owners
+ * see their content controls without visiting Studio. Read-only render contexts
+ * remain permission-free.
  */
 
 const PUBLIC_ROUTES: ReadonlyArray<readonly [string, string]> = [
@@ -47,8 +47,8 @@ afterEach(() => {
   Reflect.deleteProperty(window, 'qortalRequest');
 });
 
-describe('permission-free public browsing', () => {
-  it('issues no bridge call at all for an unscoped hosted context', async () => {
+describe('hosted owner recognition', () => {
+  it('shares one account request across direct Qortal-host mounts in a session', async () => {
     const bridge = installBridge();
 
     for (const [route, heading] of PUBLIC_ROUTES) {
@@ -60,7 +60,7 @@ describe('permission-free public browsing', () => {
       cleanup();
     }
 
-    expect(bridge).not.toHaveBeenCalled();
+    expect(accountRequests(bridge)).toHaveLength(1);
   }, 60_000);
 
   it('issues no account request in the published read-only render runtime', async () => {
@@ -89,7 +89,7 @@ describe('permission-free public browsing', () => {
     vi.unstubAllGlobals();
   });
 
-  it('never issues GET_USER_ACCOUNT while reading a scoped archive', async () => {
+  it('checks the account once while reading a scoped archive in a qortal host', async () => {
     const bridge = installBridge();
 
     renderApp({
@@ -105,6 +105,6 @@ describe('permission-free public browsing', () => {
     });
     await screen.findByRole('heading', { level: 1, name: 'Shadow Archives' });
 
-    expect(accountRequests(bridge)).toHaveLength(0);
+    expect(accountRequests(bridge)).toHaveLength(1);
   });
 });
