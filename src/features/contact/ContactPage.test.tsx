@@ -130,13 +130,39 @@ describe('ContactPage', () => {
     expect(notice).not.toHaveTextContent('1 month');
   });
 
-  it('shows the resolved owner and does not expose the owner address or public key', async () => {
+  it('removes the technical recipient/sender copy and never exposes the owner address or key', async () => {
     const { deps } = harness();
     renderPage(HOSTED, deps);
 
-    expect(await screen.findByText(PUBLISHER, { selector: 'strong' })).toBeInTheDocument();
+    // The recipient still resolves (Send becomes available), but the
+    // explanatory Recipient/Sender block is gone from the page.
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send private message' })).toBeEnabled(),
+    );
+    expect(screen.queryByRole('heading', { name: 'Recipient' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/the name this app is published under/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Sender:/)).not.toBeInTheDocument();
     expect(screen.queryByText(RECIPIENT)).not.toBeInTheDocument();
     expect(screen.queryByText('PUBLIC_KEY')).not.toBeInTheDocument();
+  });
+
+  it('keeps the send logic intact though the technical copy is gone', async () => {
+    const user = userEvent.setup();
+    const { deps } = harness();
+    renderPage(HOSTED, deps);
+
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send private message' })).toBeEnabled(),
+    );
+    await user.type(await screen.findByLabelText('Message'), 'still sends');
+    await user.click(screen.getByRole('button', { name: 'Send private message' }));
+
+    expect(await screen.findByText(/Message sent\./)).toBeInTheDocument();
+    expect(deps.send.send).toHaveBeenCalledTimes(1);
+    expect(deps.send.send).toHaveBeenCalledWith({
+      recipientAddress: RECIPIENT,
+      message: 'still sends',
+    });
   });
 
   it('blocks sending with a truthful explanation in a plain browser', async () => {
@@ -195,8 +221,9 @@ describe('ContactPage', () => {
     expect(screen.getByRole('button', { name: 'Send private message' })).toBeDisabled();
 
     gate.resolve(RESOLVED);
-    expect(await screen.findByText(PUBLISHER, { selector: 'strong' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Send private message' })).toBeEnabled();
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send private message' })).toBeEnabled(),
+    );
     expect(field).toHaveValue('typed before the owner resolved');
   });
 
@@ -206,7 +233,9 @@ describe('ContactPage', () => {
     const { deps } = harness({ attempt: () => gate.promise });
     renderPage(HOSTED, deps);
 
-    await screen.findByText(PUBLISHER, { selector: 'strong' });
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send private message' })).toBeEnabled(),
+    );
     const field = await screen.findByLabelText('Message');
     await user.type(field, 'first message');
     await user.click(screen.getByRole('button', { name: 'Send private message' }));

@@ -19,7 +19,7 @@ describe('SearchDisclosure', () => {
 
     await user.click(screen.getByRole('button', { name: 'Search the archive' }));
 
-    const input = screen.getByRole('searchbox', { name: 'Search Shadow Archives' });
+    const input = screen.getByRole('combobox', { name: 'Search Shadow Archives' });
     expect(screen.getByRole('search')).not.toHaveAttribute('hidden');
     expect(input).toBeVisible();
     expect(input).toHaveFocus();
@@ -39,7 +39,7 @@ describe('SearchDisclosure', () => {
     const { router } = renderApp({ route: '/' });
 
     await user.click(screen.getByRole('button', { name: 'Search the archive' }));
-    await user.type(screen.getByRole('searchbox', { name: 'Search Shadow Archives' }), 'redaction');
+    await user.type(screen.getByRole('combobox', { name: 'Search Shadow Archives' }), 'redaction');
     await user.keyboard('{Enter}');
 
     await waitFor(() => {

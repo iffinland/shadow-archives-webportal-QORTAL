@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
-import { useAuth } from '../../app/providers/AuthProvider';
 import { useQortalEnvironment } from '../../app/providers/BridgeProvider';
-import { Button, Skeleton } from '../../components/common';
+import { Button } from '../../components/common';
 import { CONTACT_MESSAGE_MAX_LENGTH, validateContactMessage } from '../../services/contactMessage';
-import {
-  CONTACT_RECIPIENT_MESSAGES,
-  type ContactRecipientResult,
-} from '../../services/contactRecipient';
+import type { ContactRecipientResult } from '../../services/contactRecipient';
 import { contactRetentionNotice } from '../../services/contactRetention';
 import {
   createContactSendDeps,
@@ -48,7 +44,6 @@ type ResolutionState =
  */
 export default function ContactPage({ deps: injectedDeps }: ContactPageProps = {}) {
   const environment = useQortalEnvironment();
-  const { account } = useAuth();
 
   const [draft, setDraft] = useState('');
   const [settled, setSettled] = useState<SettledResolution | null>(null);
@@ -181,35 +176,6 @@ export default function ContactPage({ deps: injectedDeps }: ContactPageProps = {
         </p>
       </section>
 
-      <section className="sa-contact__recipient" aria-labelledby="sa-contact-recipient-title">
-        <h2 className="sa-contact__recipient-title" id="sa-contact-recipient-title">
-          Recipient
-        </h2>
-        {resolution.status === 'resolving' ? (
-          <div className="sa-contact__recipient-body" role="status" aria-live="polite">
-            <Skeleton width="18rem" height="1rem" />
-            <span className="sa-visually-hidden">
-              Resolving the current owner of the publishing name.
-            </span>
-          </div>
-        ) : recipient ? (
-          <p className="sa-contact__recipient-body">
-            <strong>{recipient.publisherName}</strong> — the name this app is published under. The
-            owner address is resolved from the Qortal node now and re-checked immediately before the
-            message is sent, so a name transfer is never ignored.
-          </p>
-        ) : (
-          <p className="sa-contact__recipient-body sa-contact__recipient-body--blocked">
-            {blockedReason ?? CONTACT_RECIPIENT_MESSAGES['name-unresolved']}
-          </p>
-        )}
-        <p className="sa-contact__sender">
-          {account
-            ? `Sender: ${account.address} (the account active in this session).`
-            : 'Sender: the Qortal account currently active in your Qortal host. Your host shows that account in the approval dialog.'}
-        </p>
-      </section>
-
       <form className="sa-form sa-contact__form" onSubmit={handleSubmit} noValidate>
         <div className="sa-field">
           <label className="sa-field__label" htmlFor="sa-contact-message">
@@ -266,7 +232,8 @@ export default function ContactPage({ deps: injectedDeps }: ContactPageProps = {
           </Button>
           {recipient === null && resolution.status === 'settled' ? (
             <p className="sa-contact__blocked-note">
-              Sending is unavailable in this context, so no message can be submitted.
+              {blockedReason ??
+                'Sending is unavailable in this context, so no message can be submitted.'}
             </p>
           ) : null}
         </div>

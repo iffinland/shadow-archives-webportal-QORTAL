@@ -10,8 +10,7 @@
   gap: var(--sa-space-4);
 }
 
-.sa-contact__transport,
-.sa-contact__recipient {
+.sa-contact__transport {
   display: flex;
   flex-direction: column;
   gap: var(--sa-space-2);
@@ -21,32 +20,15 @@
   border-radius: var(--sa-radius-md);
 }
 
-.sa-contact__transport-title,
-.sa-contact__recipient-title {
+.sa-contact__transport-title {
   margin: 0;
   font-size: var(--sa-text-lg);
 }
 
-.sa-contact__transport-body,
-.sa-contact__recipient-body,
-.sa-contact__sender {
+.sa-contact__transport-body {
   margin: 0;
   max-width: 72ch;
   color: var(--sa-color-text-muted);
-}
-
-.sa-contact__recipient-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sa-space-2);
-}
-
-.sa-contact__recipient-body--blocked {
-  color: var(--sa-color-warning);
-}
-
-.sa-contact__sender {
-  font-size: var(--sa-text-sm);
 }
 
 .sa-contact__form {

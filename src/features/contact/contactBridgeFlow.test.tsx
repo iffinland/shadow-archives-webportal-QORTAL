@@ -114,8 +114,10 @@ describe('Contact flow over the production bridge graph', () => {
     const bridge = installBridge();
     renderPage();
 
-    // The recipient block shows the publishing name only.
-    expect(await screen.findByText(PUBLISHER, { selector: 'strong' })).toBeInTheDocument();
+    // Wait for the recipient to resolve via the Send action becoming available.
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send private message' })).toBeEnabled(),
+    );
 
     const field = await screen.findByLabelText('Message');
     await user.type(field, 'Please verify record 12.');
@@ -156,8 +158,10 @@ describe('Contact flow over the production bridge graph', () => {
     renderPage();
 
     // A real visitor only clicks Send once the owner has resolved; gate on the
-    // same visible signal instead of racing the resolver.
-    await screen.findByText(PUBLISHER, { selector: 'strong' });
+    // same actionable signal instead of racing the resolver.
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send private message' })).toBeEnabled(),
+    );
     const field = await screen.findByLabelText('Message');
     await user.type(field, 'hello owner');
     await user.click(screen.getByRole('button', { name: 'Send private message' }));
@@ -177,7 +181,9 @@ describe('Contact flow over the production bridge graph', () => {
     installBridge({ SEARCH_CHAT_MESSAGES: () => [] });
     renderPage();
 
-    await screen.findByText(PUBLISHER, { selector: 'strong' });
+    await vi.waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Send private message' })).toBeEnabled(),
+    );
     await user.type(await screen.findByLabelText('Message'), 'unconfirmed please');
     await user.click(screen.getByRole('button', { name: 'Send private message' }));
 

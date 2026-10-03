@@ -1,6 +1,34 @@
-import { siteConfig } from '../../app/config/siteConfig';
+import { lazy, Suspense } from 'react';
 
+import { siteConfig } from '../../app/config/siteConfig';
+import { useCapability } from '../../app/providers/CapabilityProvider';
+import { SafeRichText } from '../content/richText/SafeRichText';
+import { defaultAboutDocument } from './defaultAboutContent';
+import { useAboutPage } from './useAboutPage';
+
+/**
+ * Owner editing lives behind a dynamic import, so the TipTap editor and the
+ * About publish service are fetched only for a verified owner and never ship in
+ * the visitor startup graph.
+ */
+const AboutOwnerPanel = lazy(() => import('./owner/AboutOwnerPanel'));
+
+/**
+ * About page.
+ *
+ * Visitors see the owner-published rich-text document when one exists and is
+ * valid, and the built-in default otherwise — both through the same allowlisted
+ * renderer + DOMPurify boundary as blog bodies. The owner-only edit control is
+ * rendered only for a positively verified owner.
+ */
 export default function AboutPage() {
+  const { isOwner } = useCapability();
+  const about = useAboutPage();
+
+  const document = about.document?.data.body ?? defaultAboutDocument();
+  const readFailed =
+    about.status === 'invalid' || about.status === 'error' || about.status === 'unavailable';
+
   return (
     <div className="sa-route">
       <header className="sa-route__header">
@@ -11,39 +39,21 @@ export default function AboutPage() {
         </p>
       </header>
 
+      {isOwner && about.status !== 'loading' ? (
+        <Suspense fallback={null}>
+          <AboutOwnerPanel initialDoc={document.doc} onPublished={about.reload} />
+        </Suspense>
+      ) : null}
+
+      {isOwner && readFailed ? (
+        <p className="sa-detail__meta" role="status">
+          The published About page could not be read from this scope, so the built-in text is shown.
+          Saving replaces it.
+        </p>
+      ) : null}
+
       <div className="sa-route__prose">
-        <h2>Where the content lives</h2>
-        <p>
-          Content is published to QDN under the <code>{siteConfig.qdnService}</code> service. The
-          application holds no server, database or account of its own: it reads what the connected
-          Qortal host makes available and asks the host to sign anything that is written.
-        </p>
-
-        <h2>Who can publish</h2>
-        <p>
-          Publishing authority belongs to the current owner of the app&rsquo;s publishing name, and
-          is resolved at runtime. Owner controls are never derived from a name or address hardcoded
-          into this application, and payload fields claiming authorship are not trusted.
-        </p>
-
-        <h2>Phase status</h2>
-        <p>
-          This build is the {siteConfig.phaseLabel.toLowerCase()}: the responsive application shell
-          plus read-only QDN content discovery, runtime validation and rendering. Every payload is
-          validated before it is trusted, and the archive states distinguish an empty archive from
-          an unavailable, partial or stale index.
-        </p>
-        <p>
-          Publishing, editing, likes, comments, tips, sharing and owner studio functionality are
-          deliberately not implemented in this phase. Browsing the archive never asks for a Qortal
-          account or triggers an authentication prompt.
-        </p>
-
-        <h2>Privacy and dependencies</h2>
-        <p>
-          The shell loads only assets bundled with the app. There are no third-party fonts, image
-          CDNs, analytics or external runtime APIs, in line with the QDN content security policy.
-        </p>
+        <SafeRichText doc={document} />
       </div>
     </div>
   );
