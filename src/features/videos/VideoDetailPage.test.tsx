@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { renderApp } from '../../test/utils';
 import { makeEnvironment } from '../../test/environment';
@@ -68,6 +68,7 @@ function installSameOriginNode() {
 }
 
 afterEach(() => {
+  Reflect.deleteProperty(navigator, 'clipboard');
   resetContentCache();
   vi.unstubAllGlobals();
 });
@@ -95,6 +96,14 @@ describe('Video detail playback', () => {
     // Duration is rendered from the entity, not from the media bytes.
     expect(screen.getAllByText('1:34').length).toBeGreaterThan(0);
 
+    // The detail view reuses the shared card quick actions.
+    const actions = document.querySelector('.sa-card__actions');
+    expect(actions).toHaveAttribute('aria-label', 'Actions for Field footage');
+    expect(screen.getByRole('button', { name: 'Like' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Comment' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tip' })).toBeInTheDocument();
+
     // A detail visit must not download the video (QDN serves it through the
     // player only when the owner/visitor presses play).
     expect(calls.some((url) => url.startsWith('/arbitrary/VIDEO/'))).toBe(false);
@@ -104,5 +113,30 @@ describe('Video detail playback', () => {
           url === `/arbitrary/DOCUMENT/${encodeURIComponent(TEST_PUBLISHER)}/${ENTITY_IDENTIFIER}`,
       ),
     ).toBe(true);
+  });
+
+  it('shares a canonical Qortal deep link from the detail view, never the local node URL', async () => {
+    installSameOriginNode();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    renderApp({
+      route: `/videos/${TEST_VIDEO_ID}`,
+      environment: PUBLISHED_RENDER_NO_BRIDGE,
+      archiveLoader: () => Promise.resolve(makeArchiveSnapshot({ listings: [] })),
+    });
+
+    await screen.findByRole('heading', { name: 'Field footage' });
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        `qortal://APP/Shadow%20Archives/videos/${TEST_VIDEO_ID}`,
+      ),
+    );
+    expect(writeText.mock.calls[0][0]).not.toMatch(/^https?:\/\//);
   });
 });

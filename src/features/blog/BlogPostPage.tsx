@@ -5,6 +5,7 @@ import { useCapability } from '../../app/providers/CapabilityProvider';
 import { Button } from '../../components/common';
 import { RouteLoading } from '../../components/feedback';
 import { EntityStatePanel, TaxonomyChips, formatDate, useEntityDetail } from '../content';
+import { EntityEngagementControls } from '../engagement';
 import { SafeRichText } from '../content/richText/SafeRichText';
 
 const BlogEditModal = lazy(async () => ({
@@ -50,6 +51,7 @@ export default function BlogPostPage() {
 
       {status === 'loading' ? <RouteLoading label="Loading post" /> : null}
       {status === 'ready' && post ? <SafeRichText doc={post.data.body} /> : null}
+      {status === 'ready' && post ? <EntityEngagementControls entity={post} /> : null}
       {status !== 'loading' && status !== 'ready' ? (
         <EntityStatePanel
           status={status}

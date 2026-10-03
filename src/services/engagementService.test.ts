@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   publishComment,
@@ -27,6 +27,10 @@ function deps(): EngagementDeps {
   };
 }
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe('engagement service', () => {
   it('writes one name-scoped active-like record with the exact content target', async () => {
     const service = deps();
@@ -52,6 +56,23 @@ describe('engagement service', () => {
         name: 'Reader Name',
         identifier: expect.stringMatching(/^saw_cmt_post_abc123def456_[a-z0-9]{8}$/),
         description: 'A useful note.',
+      }),
+    );
+  });
+
+  it('generates the comment id from getRandomValues when crypto.randomUUID is absent', async () => {
+    vi.stubGlobal('crypto', {
+      getRandomValues: (array: Uint8Array) => {
+        array.fill(0x2a);
+        return array;
+      },
+    });
+    const service = deps();
+    await publishComment(target, 'Reader Name', 'Runtime note.', service);
+
+    expect(service.publish.publishResource).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: 'saw_cmt_post_abc123def456_aaaaaaaa',
       }),
     );
   });

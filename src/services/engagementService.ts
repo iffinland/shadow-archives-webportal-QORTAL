@@ -3,6 +3,7 @@ import { WRITE_ACTIONS } from '../qortal/actions';
 import { getNameData } from '../qortal/auth';
 import { QortalBridgeError, request } from '../qortal/bridge';
 import { bridgePublishPort, type PublishAttempt, type PublishPort } from '../qortal/publish';
+import { randomHexId } from '../utils/randomId';
 import { bridgeQdnReadPort, parseJsonPayload, type QdnReadPort } from './qdnReader';
 
 export type EngagementKind = 'post' | 'video' | 'gallery';
@@ -112,7 +113,9 @@ export async function publishComment(
   if (!body) throw new Error('Write a comment before publishing it.');
   if (body.length > 4096) throw new Error('A comment can contain at most 4096 characters.');
   const token = targetToken(target);
-  const suffix = crypto.randomUUID().replaceAll('-', '').slice(0, 8);
+  // `crypto.randomUUID()` is missing in some Qortal Hub/webview runtimes; the
+  // shared compatibility helper keeps the exact 8-char lowercase-hex contract.
+  const suffix = randomHexId(8);
   const now = Date.now();
   return deps.publish.publishResource({
     service: 'DOCUMENT',

@@ -14,6 +14,7 @@ import {
   mediaRefSrc,
   useEntityDetail,
 } from '../content';
+import { EntityEngagementControls } from '../engagement';
 
 const VideoEditModal = lazy(async () => ({
   default: (await import('./owner/VideoPublishModal')).VideoPublishModal,
@@ -131,6 +132,7 @@ export default function VideoDetailPage() {
               cannot render. The stored reference is shown above.
             </p>
           ) : null}
+          <EntityEngagementControls entity={video} />
         </article>
       ) : null}
 

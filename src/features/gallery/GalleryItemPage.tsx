@@ -14,6 +14,7 @@ import {
   typeKindLabel,
   useEntityDetail,
 } from '../content';
+import { EntityEngagementControls } from '../engagement';
 
 const GalleryImageEditModal = lazy(async () => ({
   default: (await import('./owner/GalleryImageModal')).GalleryImageModal,
@@ -81,6 +82,7 @@ export default function GalleryItemPage() {
             Dimensions reserved {item.data.width || 'auto'}×{item.data.height || 'auto'}; the
             original media is not downloaded for listing pages.
           </p>
+          <EntityEngagementControls entity={item} />
         </article>
       ) : null}
 

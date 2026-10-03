@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { screen } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 
 import { renderApp } from '../../test/utils';
 import { makeEnvironment } from '../../test/environment';
@@ -65,6 +65,7 @@ function installSameOriginNode() {
 }
 
 afterEach(() => {
+  Reflect.deleteProperty(navigator, 'clipboard');
   resetContentCache();
   vi.unstubAllGlobals();
 });
@@ -87,6 +88,39 @@ describe('Gallery item detail in the published read-only runtime', () => {
     expect(
       calls.some((url) => url === `/arbitrary/DOCUMENT/Shadow%20Archives/${ENTITY_IDENTIFIER}`),
     ).toBe(true);
+
+    // The detail view reuses the shared card quick actions.
+    const actions = document.querySelector('.sa-card__actions');
+    expect(actions).toHaveAttribute('aria-label', 'Actions for Plate 01');
+    expect(screen.getByRole('button', { name: 'Like' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Comment' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Share' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tip' })).toBeInTheDocument();
+  });
+
+  it('shares a canonical Qortal deep link from a gallery item detail view', async () => {
+    installSameOriginNode();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+
+    renderApp({
+      route: `/gallery/item/${TEST_ITEM_ID}`,
+      environment: PUBLISHED_RENDER_NO_BRIDGE,
+      archiveLoader: () => Promise.resolve(makeArchiveSnapshot({ listings: [] })),
+    });
+
+    await screen.findByRole('heading', { name: 'Plate 01' });
+    fireEvent.click(screen.getByRole('button', { name: 'Share' }));
+
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith(
+        `qortal://APP/Shadow%20Archives/gallery/item/${TEST_ITEM_ID}`,
+      ),
+    );
+    expect(writeText.mock.calls[0][0]).not.toMatch(/^https?:\/\//);
   });
 
   it('does not invent content in a plain browser', async () => {
