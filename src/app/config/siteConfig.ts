@@ -68,11 +68,17 @@ export const siteConfig = {
    */
   ownerNavItems: [{ to: '/studio', label: 'Studio' }] satisfies readonly NavItem[],
 
-  /** Top Posts / Top Videos panel capacity (owner decision: max 10 listed). */
+  /**
+   * Top Posts / Top Videos ticker capacity.
+   *
+   * Phase 4 decision: each box lists the latest 6 matching archive items and
+   * scrolls continuously. `minItemsForScroll` is the floor below which the loop
+   * stays static (the overflow check still prevents motion on short lists).
+   */
   topList: {
-    maxItems: 10,
+    maxItems: 6,
     /** Minimum rendered items before auto-scroll is allowed to engage. */
-    minItemsForScroll: 5,
+    minItemsForScroll: 3,
   },
 
   /** Listing card geometry is driven by validated catalog listings. */

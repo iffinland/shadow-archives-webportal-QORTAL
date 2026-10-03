@@ -7,3 +7,4 @@ export { SiteHeader } from './SiteHeader';
 export { SiteNav } from './SiteNav';
 export { TopListPanel } from './TopListPanel';
 export type { TopListKind } from './TopListPanel';
+export { TopLists } from './TopLists';

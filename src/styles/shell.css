@@ -43,7 +43,6 @@
 }
 
 .sa-banner {
-  order: 1;
   position: relative;
   height: var(--sa-header-height);
   border: 1px solid var(--sa-color-border-strong);
@@ -85,21 +84,32 @@
 
 /* -------------------------------------------------------- top list panels -- */
 
+/*
+ * Top Posts / Top Videos row. Phase 4 moved these boxes out of the header panel
+ * to sit directly below the banner: stacked and compact on narrow viewports,
+ * side-by-side from the `md` breakpoint.
+ */
+.sa-top-lists {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--sa-space-4);
+}
+
 .sa-top-list {
-  order: 2;
+  /*
+   * Fixed ticker viewport: two 44px title rows + their 2px gap, plus a thin
+   * slice of the next row that hints the list continues. The box is therefore
+   * only as tall as ~two titles and never grows with the item count.
+   */
+  --sa-top-list-track-height: 94px;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  max-height: 240px;
+  min-width: 0;
   overflow: hidden;
   background: var(--sa-color-surface);
   border: 1px solid var(--sa-color-border);
   border-radius: var(--sa-radius-md);
   box-shadow: var(--sa-shadow-2), var(--sa-shadow-inset-paper);
-}
-
-.sa-top-list[data-kind='videos'] {
-  order: 3;
 }
 
 .sa-top-list__title {
@@ -118,29 +128,41 @@
 }
 
 .sa-top-list__body {
-  flex: 1;
-  min-height: 0;
   padding: var(--sa-space-2);
   overflow: hidden;
 }
 
-.sa-top-list__track {
-  height: 100%;
+/*
+ * The shared `.sa-autoscroll` rule sets `height: 100%` at specificity (0,2,0)
+ * and `content.css` loads after `shell.css`; this selector is more specific so
+ * the vertical viewport is exactly the compact two-row box.
+ */
+.sa-top-list .sa-autoscroll[data-orientation='vertical'] {
+  height: var(--sa-top-list-track-height);
+  /* No visible native scrollbar, but the region stays scrollable when motion is
+   * disabled (reduced motion) so titles are still reachable. */
+  scrollbar-width: none;
+}
+
+.sa-top-list .sa-autoscroll[data-orientation='vertical']::-webkit-scrollbar {
+  display: none;
 }
 
 .sa-top-list__items {
   list-style: none;
   margin: 0;
-  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  /* Trailing spacer equal to the inter-title gap: the duplicated ticker copy
+   * then joins the original with exactly the same rhythm, so the continuous
+   * loop has no visible seam or blank interval. */
+  padding: 0 0 2px;
 }
 
 .sa-top-list__link {
   display: flex;
   align-items: center;
-  gap: var(--sa-space-2);
   min-height: var(--sa-hit-target);
   padding: var(--sa-space-2) var(--sa-space-3);
   border-radius: var(--sa-radius-sm);
@@ -151,12 +173,6 @@
 
 .sa-top-list__link:hover {
   background: var(--sa-color-surface-raised-hover);
-}
-
-.sa-top-list__rank {
-  min-width: 1.4em;
-  font-variant-numeric: tabular-nums;
-  color: var(--sa-color-text-muted);
 }
 
 .sa-top-list__text {
@@ -569,29 +585,11 @@
 @media (min-width: 768px) {
   .sa-site-header__inner {
     --sa-header-height: 240px;
-    grid-template-areas:
-      'banner banner'
-      'posts videos';
+  }
+
+  /* Side-by-side on normal desktop widths; stacked below this breakpoint. */
+  .sa-top-lists {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: start;
-  }
-
-  .sa-banner {
-    grid-area: banner;
-    order: 0;
-  }
-
-  .sa-top-list {
-    order: 0;
-    max-height: 260px;
-  }
-
-  .sa-top-list[data-kind='posts'] {
-    grid-area: posts;
-  }
-
-  .sa-top-list[data-kind='videos'] {
-    grid-area: videos;
   }
 
   .sa-site-footer__inner {
@@ -611,17 +609,6 @@
 @media (min-width: 1024px) {
   .sa-site-header__inner {
     --sa-header-height: 280px;
-    grid-template-areas: 'posts banner videos';
-    grid-template-columns:
-      var(--sa-header-side-lg)
-      minmax(0, 1fr)
-      var(--sa-header-side-lg);
-    align-items: stretch;
-  }
-
-  .sa-top-list {
-    max-height: none;
-    height: var(--sa-header-height);
   }
 
   /* Owner decision: the primary action row occupies ~70% of the page width. */
@@ -634,10 +621,6 @@
 @media (min-width: 1440px) {
   .sa-site-header__inner {
     --sa-header-height: 320px;
-    grid-template-columns:
-      var(--sa-header-side)
-      minmax(0, 1fr)
-      var(--sa-header-side);
   }
 }
 

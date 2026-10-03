@@ -1,30 +1,45 @@
+import { useMemo } from 'react';
+
 import { siteConfig } from '../../app/config/siteConfig';
-import type { CollectionState, TopListEntry } from '../../types/content';
+import { useListingState } from '../content/hooks';
+import type { CollectionState, ContentCardModel, TopListEntry } from '../../types/content';
 
 /**
  * Top Posts / Top Videos data source.
  *
- * Like-ranked lists require engagement reading, which is not implemented in
- * Phase 2A (likes are explicitly out of scope). The panel therefore reports an
- * honest `unavailable` state with an explicit reason instead of fabricating a
- * ranking or issuing like queries.
+ * Phase 4 replaces the previous like-ranked placeholder with the latest archive
+ * items. Both panels read the already-loaded, validated catalog snapshot through
+ * the shared content hooks: no new QDN search, no polling and no engagement
+ * read is issued for this feature. The snapshot is ordered latest-first
+ * (`updatedAt` desc) by the read pipeline, so "latest N" is a bounded slice of
+ * that existing order.
  *
- * `maxItems` comes from owner-editable config (owner decision: at most 10).
+ * `maxItems` comes from owner-editable config (Phase 4 decision: 6).
  */
 export interface TopListState extends CollectionState<TopListEntry> {
   readonly maxItems: number;
 }
 
-const RANKING_UNAVAILABLE: Omit<TopListState, 'maxItems'> = {
-  status: 'unavailable',
-  items: [],
-  message: 'Ranking unavailable until engagement data is implemented.',
-};
+/** Map validated listing cards to the minimal title-only ticker entry. */
+export function toTopEntries(cards: readonly ContentCardModel[], limit: number): TopListEntry[] {
+  return cards
+    .slice(0, Math.max(0, limit))
+    .map((card) => ({ id: card.id, title: card.title, href: card.href }));
+}
+
+function useLatestTopList(type: 'blog-post' | 'video'): TopListState {
+  const limit = siteConfig.topList.maxItems;
+  const state = useListingState({ type }, limit);
+  return useMemo(
+    () => ({ ...state, items: toTopEntries(state.items, limit), maxItems: limit }),
+    [state, limit],
+  );
+}
 
 export function useTopPosts(): TopListState {
-  return { ...RANKING_UNAVAILABLE, maxItems: siteConfig.topList.maxItems };
+  return useLatestTopList('blog-post');
 }
 
 export function useTopVideos(): TopListState {
-  return { ...RANKING_UNAVAILABLE, maxItems: siteConfig.topList.maxItems };
+  return useLatestTopList('video');
 }

@@ -101,14 +101,26 @@ describe('HomePage with a validated archive snapshot', () => {
     expect(bridge.mock.calls.some((call) => call[0]?.action === 'GET_USER_ACCOUNT')).toBe(true);
   });
 
-  it('keeps Top Posts and Top Videos honest instead of fabricating a ranking', async () => {
+  it('feeds the Top Posts / Top Videos tickers from the same catalog snapshot', async () => {
     renderApp({ route: '/', environment: HOSTED, archiveLoader: loader });
-    await screen.findByRole('region', { name: 'Latest Posts' });
 
-    const messages = screen.getAllByText(
-      'Ranking unavailable until engagement data is implemented.',
+    const topPosts = await screen.findByRole('region', { name: 'Top Posts' });
+    const topVideos = screen.getByRole('region', { name: 'Top Videos' });
+
+    expect(within(topPosts).getByRole('link', { name: 'Redaction notes' })).toHaveAttribute(
+      'href',
+      `/blog/${TEST_BLOG_ID}`,
     );
-    expect(messages.length).toBeGreaterThanOrEqual(1);
+    expect(within(topVideos).getByRole('link', { name: 'Field footage' })).toHaveAttribute(
+      'href',
+      `/videos/${TEST_VIDEO_ID}`,
+    );
+
+    // Latest-first separation: a blog post never appears in the video ticker.
+    expect(
+      within(topVideos).queryByRole('link', { name: 'Redaction notes' }),
+    ).not.toBeInTheDocument();
+    expect(within(topPosts).queryByRole('link', { name: 'Field footage' })).not.toBeInTheDocument();
   });
 
   it('shows an honest unavailable state (not empty) when the loader reports failure', async () => {
@@ -142,7 +154,9 @@ describe('published render runtime without a bridge', () => {
     renderApp({ route: '/', environment: PUBLISHED_RENDER_NO_BRIDGE, archiveLoader: loader });
 
     const posts = await screen.findByRole('region', { name: 'Latest Posts' });
-    expect(within(posts).getByRole('link', { name: 'Redaction notes' })).toBeInTheDocument();
+    // The region (and its name) renders while the snapshot is still loading, so
+    // await the loaded card instead of racing the async read with a sync query.
+    expect(await within(posts).findByRole('link', { name: 'Redaction notes' })).toBeInTheDocument();
     expect(screen.queryByText(NO_PUBLISHER_CLAIM)).not.toBeInTheDocument();
     expect(screen.queryByText(/not running inside a Qortal runtime/i)).not.toBeInTheDocument();
   });
