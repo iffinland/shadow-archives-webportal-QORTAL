@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildQortalAppUrl,
+  buildQortalResourceUrl,
   isExternalHttpUrl,
   isQortalUrl,
   qortalAppIdFromName,
@@ -17,6 +18,17 @@ describe('buildQortalAppUrl', () => {
   it('percent-encodes names that need it and supports an optional path', () => {
     expect(buildQortalAppUrl('Some App')).toBe('qortal://APP/Some%20App');
     expect(buildQortalAppUrl('Q-Tube', '/watch/abc')).toBe('qortal://APP/Q-Tube/watch/abc');
+  });
+});
+
+describe('buildQortalResourceUrl', () => {
+  it('builds a QDN deep link for a non-APP service and encodes the name', () => {
+    expect(buildQortalResourceUrl('WEBSITE', 'Qortal Web Builders', '/')).toBe(
+      'qortal://WEBSITE/Qortal%20Web%20Builders/',
+    );
+    expect(buildQortalResourceUrl('WEBSITE', 'Qortal Web Builders')).toBe(
+      'qortal://WEBSITE/Qortal%20Web%20Builders',
+    );
   });
 });
 

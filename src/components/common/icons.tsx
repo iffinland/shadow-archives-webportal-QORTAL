@@ -119,3 +119,27 @@ export function IconWarning(props: IconProps) {
     </svg>
   );
 }
+
+export function IconTriangleLeft(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props} fill="currentColor" stroke="none">
+      <path d="M15.5 4.5 6.5 12l9 7.5V4.5Z" />
+    </svg>
+  );
+}
+
+export function IconTriangleRight(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props} fill="currentColor" stroke="none">
+      <path d="M8.5 4.5 17.5 12l-9 7.5V4.5Z" />
+    </svg>
+  );
+}
+
+export function IconChevronUp(props: IconProps) {
+  return (
+    <svg {...baseProps} {...props}>
+      <path d="m6 15 6-6 6 6" />
+    </svg>
+  );
+}

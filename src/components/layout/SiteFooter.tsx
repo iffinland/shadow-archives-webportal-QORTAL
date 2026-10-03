@@ -1,12 +1,14 @@
 import { siteConfig } from '../../app/config/siteConfig';
 import { buildInfo } from '../../build/buildInfo';
+import { buildQortalResourceUrl } from '../../qortal/navigation';
+
+/** Builder credit target: a QDN `WEBSITE` resource, never an http(s) link. */
+const CREDIT_HREF = buildQortalResourceUrl('WEBSITE', 'Qortal Web Builders', '/');
 
 /**
- * Minimal footer: brand/description plus text-only provenance.
- *
- * It intentionally contains NO navigation links, NO external/Web2 links and NO
- * repository URL. The site sections live in the primary navigation above; the
- * footer only states identity, where the app runs and which build is displayed.
+ * Minimal footer: brand/tagline plus text-only provenance, with one Qortal
+ * QDN deep link (the builder credit). It intentionally contains NO route
+ * navigation, NO Web2/http(s) links and NO repository URL.
  */
 export function SiteFooter() {
   return (
@@ -18,8 +20,10 @@ export function SiteFooter() {
         </div>
 
         <div className="sa-site-footer__meta">
-          <p className="sa-site-footer__text">Decentralized on Qortal</p>
-          <p className="sa-site-footer__text">
+          <a className="sa-site-footer__credit" href={CREDIT_HREF}>
+            Web Design &amp; Build
+          </a>
+          <p className="sa-site-footer__text sa-site-footer__build">
             Build v{buildInfo.version} · <code>{buildInfo.commitShort}</code>
           </p>
         </div>

@@ -87,16 +87,27 @@ describe('AppShell', () => {
     }
   });
 
-  it('renders a minimal footer with no navigation, route links or repository URL', () => {
+  it('renders a minimal footer with the tagline and a single Qortal QDN credit', () => {
     renderApp({ route: '/' });
 
     const footer = screen.getByRole('contentinfo');
-    expect(within(footer).queryAllByRole('link')).toHaveLength(0);
     expect(within(footer).queryByRole('navigation')).not.toBeInTheDocument();
-    expect(footer.querySelector('a')).toBeNull();
     expect(footer).not.toHaveTextContent('github.com');
     expect(footer).not.toHaveTextContent('Sections');
-    expect(footer).toHaveTextContent('Decentralized on Qortal');
+    expect(footer).toHaveTextContent('Uncovering the past - exposing the truth');
     expect(footer).toHaveTextContent(`Build v${buildInfo.version}`);
+
+    const links = within(footer).getAllByRole('link');
+    expect(links).toHaveLength(1);
+    expect(links[0]).toHaveTextContent('Web Design & Build');
+    expect(links[0]).toHaveAttribute('href', 'qortal://WEBSITE/Qortal%20Web%20Builders/');
+  });
+
+  it('renders an accessible Back to top control', () => {
+    renderApp({ route: '/' });
+
+    const button = screen.getByRole('button', { name: 'Back to top' });
+    expect(button).toHaveAttribute('title', 'Back to top');
+    expect(button).toHaveAttribute('data-visible', 'false');
   });
 });

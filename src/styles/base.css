@@ -103,6 +103,45 @@ a:hover {
   transform: translateY(0);
 }
 
+/* Fixed, unobtrusive "Back to top" control. Hidden near the page top and kept
+ * clear of the lower edge (and mobile safe areas) so it never covers content. */
+.sa-back-to-top {
+  position: fixed;
+  inset-block-end: calc(var(--sa-space-5) + env(safe-area-inset-bottom, 0px));
+  inset-inline-end: calc(var(--sa-space-4) + env(safe-area-inset-right, 0px));
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sa-hit-target);
+  height: var(--sa-hit-target);
+  padding: 0;
+  border: 1px solid var(--sa-color-border-strong);
+  border-radius: var(--sa-radius-pill);
+  background: color-mix(in srgb, var(--sa-color-surface-raised) 88%, transparent);
+  color: var(--sa-color-text);
+  box-shadow: var(--sa-shadow-2), var(--sa-shadow-inset-paper);
+  cursor: pointer;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(calc(var(--sa-space-2) + 6px));
+  transition:
+    opacity var(--sa-motion-base) var(--sa-motion-easing),
+    transform var(--sa-motion-base) var(--sa-motion-easing),
+    visibility var(--sa-motion-base) var(--sa-motion-easing);
+}
+
+.sa-back-to-top[data-visible='true'] {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.sa-back-to-top:hover {
+  background: var(--sa-color-surface-raised-hover);
+  border-color: var(--sa-color-accent);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

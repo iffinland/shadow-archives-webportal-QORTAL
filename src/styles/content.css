@@ -330,18 +330,40 @@
 /* ----------------------------------------------------- gallery strip ----- */
 
 .sa-gallery__body {
-  min-height: 190px;
+  /* Height is driven by the tiles; keep a small floor so the loading and empty
+   * states do not collapse the section. */
+  min-height: var(--sa-gallery-tile-height);
 }
 
-.sa-gallery__track {
+/* --- carousel (translate-based, no native scrollbar) --------------------- */
+
+.sa-gallery__carousel {
+  position: relative;
   width: 100%;
+  overflow: hidden;
+  scrollbar-width: none;
+}
+
+.sa-gallery__carousel-track {
+  display: flex;
+  flex-direction: row;
+  width: max-content;
+  will-change: transform;
+}
+
+.sa-gallery__carousel-copy {
+  display: block;
+  flex: 0 0 auto;
+  width: max-content;
+  /* Trailing gap keeps the cloned copy seamlessly attached to the original. */
+  padding-inline-end: var(--sa-space-3);
 }
 
 .sa-gallery__items {
   display: flex;
   gap: var(--sa-space-3);
   margin: 0;
-  padding: 0 0 var(--sa-space-2);
+  padding: 0;
   list-style: none;
 }
 
@@ -350,15 +372,28 @@
 }
 
 .sa-gallery__link {
+  position: relative;
   display: block;
   color: var(--sa-color-text);
   text-decoration: none;
+  border-radius: var(--sa-radius-sm);
 }
 
 .sa-gallery__tile {
   width: 100%;
+  /* A single fixed visual height for every thumbnail. Width and height are both
+   * definite, so the intrinsic aspect ratio is ignored and the image is cropped
+   * (never distorted) with object-fit below. */
+  height: var(--sa-gallery-tile-height);
   border: 1px solid var(--sa-color-border);
   border-radius: var(--sa-radius-sm);
+}
+
+.sa-gallery__tile .sa-media-frame__image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
 }
 
 .sa-gallery__fallback {
@@ -367,16 +402,85 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  aspect-ratio: 4 / 3;
   background: var(--sa-color-surface-sunken);
   color: var(--sa-color-text-muted);
 }
 
+/* Title badge: revealed on hover/focus, so it never consumes vertical space. */
 .sa-gallery__caption {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-end: 0;
   display: block;
-  margin-top: var(--sa-space-2);
-  color: var(--sa-color-text-muted);
+  padding: var(--sa-space-2) var(--sa-space-3);
+  border-end-start-radius: var(--sa-radius-sm);
+  border-end-end-radius: var(--sa-radius-sm);
+  background: linear-gradient(180deg, transparent, rgb(24 18 10 / 0.82) 58%);
+  color: #fdf6e3;
   font-size: var(--sa-text-sm);
+  line-height: var(--sa-leading-tight);
+  opacity: 0;
+  transition: opacity var(--sa-motion-fast) var(--sa-motion-easing);
+  pointer-events: none;
+}
+
+.sa-gallery__link:hover .sa-gallery__caption,
+.sa-gallery__link:focus-visible .sa-gallery__caption,
+.sa-gallery__link:focus-within .sa-gallery__caption {
+  opacity: 1;
+}
+
+/* --- semi-transparent triangular edge controls --------------------------- */
+
+.sa-gallery__nav {
+  position: absolute;
+  inset-block-start: calc((var(--sa-gallery-tile-height) - var(--sa-hit-target)) / 2);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sa-hit-target);
+  height: var(--sa-hit-target);
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--sa-color-border-strong) 70%, transparent);
+  border-radius: var(--sa-radius-pill);
+  background: color-mix(in srgb, var(--sa-color-surface-raised) 62%, transparent);
+  color: var(--sa-color-text);
+  cursor: pointer;
+  opacity: 0.72;
+  transition:
+    opacity var(--sa-motion-fast) var(--sa-motion-easing),
+    background-color var(--sa-motion-fast) var(--sa-motion-easing);
+}
+
+.sa-gallery__nav:hover,
+.sa-gallery__nav:focus-visible,
+.sa-gallery__nav:active {
+  opacity: 1;
+  background: color-mix(in srgb, var(--sa-color-surface-raised) 88%, transparent);
+}
+
+.sa-gallery__nav--prev {
+  inset-inline-start: var(--sa-space-2);
+}
+
+.sa-gallery__nav--next {
+  inset-inline-end: var(--sa-space-2);
+}
+
+/* --- loading ------------------------------------------------------------- */
+
+.sa-gallery__skeleton {
+  display: flex;
+  gap: var(--sa-space-3);
+  overflow: hidden;
+}
+
+.sa-gallery__skeleton-tile {
+  flex: 0 0 var(--sa-gallery-tile);
+  width: var(--sa-gallery-tile);
+  height: var(--sa-gallery-tile-height);
+  border-radius: var(--sa-radius-sm);
 }
 
 /* --------------------------------------------------------- autoscroll ---- */

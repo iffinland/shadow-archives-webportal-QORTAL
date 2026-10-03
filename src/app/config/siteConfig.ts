@@ -30,7 +30,7 @@ export const siteConfig = {
   /** Human-readable canonical identity. Runtime truth still comes from `_qdnName`. */
   name: 'Shadow Archives',
   shortName: 'Shadow Archives',
-  description: 'A Qortal Q-App archive for blog posts, videos and gallery media published to QDN.',
+  description: 'Uncovering the past - exposing the truth',
   /** QDN service this APP is published under. */
   qdnService: 'APP',
   repositoryUrl: 'https://github.com/iffinland/shadow-archives-webportal-QORTAL',

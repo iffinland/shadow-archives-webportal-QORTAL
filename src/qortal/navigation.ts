@@ -13,11 +13,19 @@ import { request } from './bridge';
 
 const QORTAL_SCHEME_PREFIX = 'qortal://';
 
-/** Build the verified app-navigation URL for a published Q-App name. */
-export function buildQortalAppUrl(appName: string, path = ''): string {
-  const base = `${QORTAL_SCHEME_PREFIX}APP/${encodeURIComponent(appName)}`;
+/**
+ * Build the verified QDN deep link for any service (`APP`, `WEBSITE`, ...).
+ * The host intercepts a real `qortal://` anchor and opens the resource.
+ */
+export function buildQortalResourceUrl(service: string, name: string, path = ''): string {
+  const base = `${QORTAL_SCHEME_PREFIX}${encodeURIComponent(service)}/${encodeURIComponent(name)}`;
   if (!path) return base;
   return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
+/** Build the verified app-navigation URL for a published Q-App name. */
+export function buildQortalAppUrl(appName: string, path = ''): string {
+  return buildQortalResourceUrl('APP', appName, path);
 }
 
 /** True for any `qortal://` (or `qortal:`) link — app navigation or QDN resource. */

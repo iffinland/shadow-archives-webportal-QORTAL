@@ -1,6 +1,7 @@
 import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
 
+import { BackToTop } from '../common';
 import { RouteLoading } from '../feedback';
 import { PrimaryActions } from './PrimaryActions';
 import { SiteFooter } from './SiteFooter';
@@ -33,6 +34,7 @@ export function AppShell() {
         </Suspense>
       </main>
       <SiteFooter />
+      <BackToTop />
     </div>
   );
 }

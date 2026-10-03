@@ -356,9 +356,9 @@
 }
 
 /*
- * Minimal two-part footer: brand/description and provenance. It deliberately
- * contains no navigation, no external links and no repository URL — those live
- * in the main site navigation above.
+ * Minimal two-part footer: brand/tagline and provenance, plus one Qortal QDN
+ * deep link (the builder credit). No route navigation, no Web2/http(s) links
+ * and no repository URL.
  */
 .sa-site-footer__inner {
   display: grid;
@@ -390,6 +390,24 @@
   margin: 0;
   font-size: var(--sa-text-sm);
   color: var(--sa-color-text-muted);
+}
+
+.sa-site-footer__credit {
+  align-self: flex-start;
+  color: #004c99;
+  font-size: var(--sa-text-sm);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.sa-site-footer__credit:hover,
+.sa-site-footer__credit:focus-visible {
+  color: color-mix(in srgb, #004c99 78%, #000);
+  text-decoration: none;
+}
+
+.sa-site-footer__build {
+  font-size: var(--sa-text-xs);
 }
 
 /* ---------------------------------------------------------------- buttons -- */
@@ -501,6 +519,10 @@
 
   .sa-site-footer__meta {
     text-align: right;
+  }
+
+  .sa-site-footer__credit {
+    align-self: flex-end;
   }
 }
 

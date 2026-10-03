@@ -52,6 +52,7 @@ export {
 export { deriveCapability, isOwner, isOwnerCapableRuntime } from './capability';
 export {
   buildQortalAppUrl,
+  buildQortalResourceUrl,
   qortalAppIdFromName,
   isExternalHttpUrl,
   isQortalUrl,

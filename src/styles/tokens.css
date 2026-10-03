@@ -140,6 +140,7 @@
   --sa-header-side-lg: 200px;
   --sa-header-height: 180px;
   --sa-gallery-tile: 220px;
+  --sa-gallery-tile-height: 160px;
   --sa-hit-target: 44px;
 
   /* ---- motion ---- */
@@ -149,6 +150,13 @@
   --sa-motion-easing: cubic-bezier(0.2, 0.7, 0.2, 1);
   --sa-marquee-vertical: 32s;
   --sa-marquee-gallery: 60s;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --sa-gallery-tile: 168px;
+    --sa-gallery-tile-height: 126px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,16 +1,11 @@
 import { Link } from 'react-router-dom';
 
-import {
-  AutoScrollTrack,
-  IconImage,
-  MediaFrame,
-  Skeleton,
-  SkeletonGroup,
-} from '../../../components/common';
+import { IconImage, MediaFrame, Skeleton, SkeletonGroup } from '../../../components/common';
 import { EmptyState } from '../../../components/feedback';
 import { routes } from '../../../app/config/navigation';
 import type { CollectionState, ContentCardModel } from '../../../types/content';
 import { useLatestGalleryItems } from '../homeContent';
+import { GalleryCarousel } from './GalleryCarousel';
 import { SectionHeader } from './SectionHeader';
 
 interface GalleryStripProps {
@@ -21,6 +16,10 @@ interface GalleryStripProps {
 /**
  * `LATEST FROM THE GALLERY` — responsive horizontal strip. Listings use
  * thumbnails only; the strip never downloads a gallery original.
+ *
+ * Navigation is a translate-based carousel: no visible scrollbar, slow
+ * continuous motion and semi-transparent triangular edge controls. Each title
+ * is an overlay badge revealed on hover/focus so it costs no vertical space.
  */
 export function GalleryStrip({ state }: GalleryStripProps) {
   return state ? <GalleryStripView data={state} /> : <GalleryStripConnected />;
@@ -43,14 +42,13 @@ function GalleryStripView({ data }: { readonly data: CollectionState<ContentCard
       />
       <div className="sa-gallery__body">
         {data.status === 'loading' ? (
-          <SkeletonGroup label="Loading gallery strip" className="sa-gallery__track">
+          <SkeletonGroup label="Loading gallery strip" className="sa-gallery__skeleton">
             {[0, 1, 2, 3, 4, 5].map((tile) => (
-              <Skeleton key={tile} className="sa-gallery__tile" />
+              <Skeleton key={tile} className="sa-gallery__skeleton-tile" />
             ))}
           </SkeletonGroup>
         ) : data.status === 'ready' && data.items.length > 0 ? (
-          <AutoScrollTrack
-            orientation="horizontal"
+          <GalleryCarousel
             label="Latest gallery media"
             itemCount={data.items.length}
             minItemsForScroll={4}
@@ -77,7 +75,7 @@ function GalleryStripView({ data }: { readonly data: CollectionState<ContentCard
                 </li>
               ))}
             </ul>
-          </AutoScrollTrack>
+          </GalleryCarousel>
         ) : (
           <EmptyState
             compact
